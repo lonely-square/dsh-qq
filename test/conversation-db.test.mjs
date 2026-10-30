@@ -8,6 +8,7 @@ import {
   appendConversationMessage,
   conversationDatabaseAvailable,
   searchConversation,
+  searchConversationWindows,
   CONVERSATION_DB,
 } from '../src/conversation-db.js'
 
@@ -72,4 +73,39 @@ sqliteTest('同一 OneBot message_id 重放不重复入库', async () => {
   await appendConversationMessage(dir, entry)
   await appendConversationMessage(dir, entry)
   assert.equal((await searchConversation(dir, { query: '只记一次' })).length, 1)
+})
+
+sqliteTest('默认命中点可扩大，每个命中点带前后原话', async () => {
+  const dir = tmp()
+  const lines = ['开场', '甲之前', '回答甲', '中间一', '中间二', '乙之前', '回答乙', '收尾']
+  for (let index = 0; index < lines.length; index += 1) {
+    await appendConversationMessage(dir, {
+      who: index % 2 ? '用户(1)' : '鲸鲸(2)',
+      text: lines[index],
+      role: index % 2 ? 'user' : 'agent',
+      time: new Date(2026, 9, 20, 10, 0, index),
+    })
+  }
+
+  const one = await searchConversationWindows(dir, { query: '之前', hits: 1, around: 1 })
+  assert.equal(one.hits.length, 1)
+  assert.equal(one.windows.length, 1)
+  assert.equal(one.windows[0].rows.length, 3)
+  assert.deepEqual(one.windows[0].rows.map((row) => row.text), ['中间二', '乙之前', '回答乙'])
+
+  const expanded = await searchConversationWindows(dir, { query: '之前', hits: 2, around: 1 })
+  assert.equal(expanded.hits.length, 2)
+  assert.equal(expanded.windows.length, 2)
+  assert.equal(expanded.windows.reduce((n, window) => n + window.rows.length, 0), 6)
+})
+
+sqliteTest('邻近命中点的上下文重叠时合并，不重复塞入', async () => {
+  const dir = tmp()
+  for (const [index, text] of ['前', '橘子甲', '橘子乙', '后'].entries()) {
+    await appendConversationMessage(dir, { who: '用户(1)', text, role: 'user', time: new Date(2026, 9, 20, 11, 0, index) })
+  }
+  const result = await searchConversationWindows(dir, { query: '橘子', hits: 5, around: 1 })
+  assert.equal(result.hits.length, 2)
+  assert.equal(result.windows.length, 1)
+  assert.deepEqual(result.windows[0].rows.map((row) => row.text), ['前', '橘子甲', '橘子乙', '后'])
 })

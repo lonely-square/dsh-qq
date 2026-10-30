@@ -200,39 +200,134 @@ function boundary(value, endOfDay = false) {
 }
 
 /** 查当前对象的原始历史；query 为空时返回最近消息。 */
-export async function searchConversation(dir, { query = '', limit = 30, before = '', after = '', selfId = '' } = {}) {
+const SELECT_MESSAGE = `
+  SELECT id, occurred_at AS occurredAt, role, sender_id AS senderId,
+         sender_name AS senderName, who, text, message_id AS messageId
+  FROM messages
+`
+
+function filters({ query = '', before = '', after = '' } = {}) {
+  const clauses = ['authorized = 1']
+  const params = []
+  const words = String(query).trim().split(/\s+/).filter(Boolean).slice(0, 8)
+  for (const word of words) {
+    clauses.push('(text LIKE ? ESCAPE \'\\\' OR who LIKE ? ESCAPE \'\\\')')
+    const escaped = word.replace(/[\\%_]/g, '\\$&')
+    params.push(`%${escaped}%`, `%${escaped}%`)
+  }
+  const beforeMs = boundary(before, true)
+  const afterMs = boundary(after, false)
+  if (beforeMs !== null) {
+    clauses.push('occurred_at <= ?')
+    params.push(beforeMs)
+  }
+  if (afterMs !== null) {
+    clauses.push('occurred_at >= ?')
+    params.push(afterMs)
+  }
+  return { clauses, params }
+}
+
+function queryRows(db, options = {}) {
+  const { clauses, params } = filters(options)
+  const take = Math.min(Math.max(1, Number(options.limit) || 30), 100)
+  return db.prepare(`
+    ${SELECT_MESSAGE}
+    WHERE ${clauses.join(' AND ')}
+    ORDER BY occurred_at DESC, id DESC
+    LIMIT ?
+  `).all(...params, take)
+}
+
+export async function searchConversation(dir, options = {}) {
+  if (!dir) throw new Error('当前会话没有独立目录')
+  return serial(dir, async () => {
+    const db = await open(dir, { selfId: options.selfId })
+    try {
+      return queryRows(db, options)
+    } finally {
+      db.close()
+    }
+  })
+}
+
+function rowsAround(db, hit, around) {
+  const before = db.prepare(`
+    ${SELECT_MESSAGE}
+    WHERE authorized = 1
+      AND (occurred_at < ? OR (occurred_at = ? AND id <= ?))
+    ORDER BY occurred_at DESC, id DESC
+    LIMIT ?
+  `).all(hit.occurredAt, hit.occurredAt, hit.id, around + 1).reverse()
+  const after = db.prepare(`
+    ${SELECT_MESSAGE}
+    WHERE authorized = 1
+      AND (occurred_at > ? OR (occurred_at = ? AND id > ?))
+    ORDER BY occurred_at ASC, id ASC
+    LIMIT ?
+  `).all(hit.occurredAt, hit.occurredAt, hit.id, around)
+  return [...before, ...after]
+}
+
+/**
+ * 先找命中点，再展开每个命中点前后的原话。
+ * 返回的 windows 已合并重叠片段，片段内按旧→新排列。
+ */
+export async function searchConversationWindows(
+  dir,
+  { query = '', hits = 5, around = 2, before = '', after = '', selfId = '' } = {},
+) {
   if (!dir) throw new Error('当前会话没有独立目录')
   return serial(dir, async () => {
     const db = await open(dir, { selfId })
     try {
-      const clauses = ['authorized = 1']
-      const params = []
-      const words = String(query).trim().split(/\s+/).filter(Boolean).slice(0, 8)
-      for (const word of words) {
-        clauses.push('(text LIKE ? ESCAPE \'\\\' OR who LIKE ? ESCAPE \'\\\')')
-        const escaped = word.replace(/[\\%_]/g, '\\$&')
-        params.push(`%${escaped}%`, `%${escaped}%`)
+      const hitLimit = Math.min(Math.max(1, Number(hits) || 5), 20)
+      const radius = Math.min(Math.max(0, Number(around) || 2), 8)
+      const cleanQuery = String(query).trim()
+
+      // 没有检索词就是「看最近」：不伪造命中点，只给一个连续尾巴。
+      if (!cleanQuery) {
+        const recent = queryRows(db, { before, after, limit: Math.min(hitLimit * 2, 40) }).reverse()
+        return { hits: [], windows: recent.length ? [{ rows: recent, hitIds: [] }] : [] }
       }
-      const beforeMs = boundary(before, true)
-      const afterMs = boundary(after, false)
-      if (beforeMs !== null) {
-        clauses.push('occurred_at <= ?')
-        params.push(beforeMs)
+
+      const found = queryRows(db, { query: cleanQuery, before, after, limit: hitLimit })
+      const hitIds = new Set(found.map((row) => Number(row.id)))
+      const windows = []
+
+      for (const hit of found) {
+        const rows = rowsAround(db, hit, radius)
+        const ids = new Set(rows.map((row) => Number(row.id)))
+        const overlaps = windows.filter((window) => [...ids].some((id) => window.ids.has(id)))
+        if (overlaps.length === 0) {
+          windows.push({ ids, rows: new Map(rows.map((row) => [Number(row.id), row])) })
+          continue
+        }
+        const target = overlaps[0]
+        for (const row of rows) {
+          target.ids.add(Number(row.id))
+          target.rows.set(Number(row.id), row)
+        }
+        for (const extra of overlaps.slice(1)) {
+          for (const [id, row] of extra.rows) {
+            target.ids.add(id)
+            target.rows.set(id, row)
+          }
+          windows.splice(windows.indexOf(extra), 1)
+        }
       }
-      if (afterMs !== null) {
-        clauses.push('occurred_at >= ?')
-        params.push(afterMs)
+
+      return {
+        hits: found,
+        windows: windows
+          .map((window) => ({
+            hitIds: [...window.ids].filter((id) => hitIds.has(id)),
+            rows: [...window.rows.values()].sort(
+              (a, b) => Number(a.occurredAt) - Number(b.occurredAt) || Number(a.id) - Number(b.id),
+            ),
+          }))
+          .sort((a, b) => Number(b.rows.at(-1)?.occurredAt ?? 0) - Number(a.rows.at(-1)?.occurredAt ?? 0)),
       }
-      const take = Math.min(Math.max(1, Number(limit) || 30), 100)
-      params.push(take)
-      return db.prepare(`
-        SELECT id, occurred_at AS occurredAt, role, sender_id AS senderId,
-               sender_name AS senderName, who, text, message_id AS messageId
-        FROM messages
-        WHERE ${clauses.join(' AND ')}
-        ORDER BY occurred_at DESC, id DESC
-        LIMIT ?
-      `).all(...params)
     } finally {
       db.close()
     }
@@ -248,4 +343,24 @@ export function formatConversationRows(rows = []) {
     const msg = row.messageId ? ` #msg=${row.messageId}` : ''
     return `${stamp} · ${who}：${String(row.text).replace(/\n+/g, ' ⏎ ')}${msg}`
   }).join('\n')
+}
+
+export function formatConversationWindows(windows = [], { maxChars = 6000 } = {}) {
+  if (!windows.length) return '（没找到相关对话）'
+  const blocks = windows.map((window, index) => {
+    const hitIds = new Set((window.hitIds ?? []).map(Number))
+    const lines = (window.rows ?? []).map((row) => {
+      const at = new Date(Number(row.occurredAt))
+      const stamp = Number.isNaN(at.getTime()) ? '' : at.toLocaleString('zh-CN', { hour12: false })
+      const who = String(row.who || row.senderName || (row.role === 'agent' ? '你' : '对方'))
+      const mark = hitIds.has(Number(row.id)) ? '★ ' : '  '
+      const msg = row.messageId ? ` #msg=${row.messageId}` : ''
+      return `${mark}${stamp} · ${who}：${String(row.text).replace(/\n+/g, ' ⏎ ')}${msg}`
+    })
+    return `[片段 ${index + 1}]\n${lines.join('\n')}`
+  })
+  const text = blocks.join('\n\n')
+  if (text.length <= maxChars) return text
+  const clipped = text.slice(0, maxChars).replace(/\n[^\n]*$/, '')
+  return `${clipped}\n（结果过长，已截断；可缩小日期或换更准的关键词再查）`
 }

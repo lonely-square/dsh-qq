@@ -25,7 +25,7 @@ import { appendFact, upsertGlossaryTerm } from './settings.js'
 import { auditOutbound } from './audit.js'
 import { lookupMeme } from './meme.js'
 import { downloadImage } from './inbound.js'
-import { formatConversationRows, searchConversation } from './conversation-db.js'
+import { formatConversationWindows, searchConversationWindows } from './conversation-db.js'
 
 /**
  * 工具直接发出去的文字也要过审计。
@@ -166,13 +166,15 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     name: 'qq_history',
     description:
       '检索当前这个群或当前这个私聊对象的历史原话。' +
-      '对方说「之前」「上次」「你还记得」，或当前上下文不足以回答时再用；平时聊天不用每轮查。' +
-      '不传 query 就看最近原话，传关键词就在该对象的独立 SQLite 库里查，不会串到别的群或私聊。',
+      '对方明确要你回忆/检索，说「之前」「上次」「你还记得」，或你对当前话里的指代、群内说法确实不懂时再用；平时聊天不用每轮查。' +
+      '默认找 5 个命中点，每个带前后各 2 条原话并合并重叠片段；还看不懂时再增大 hits 或 around，别一开始就拉满。' +
+      '只查该对象的独立 SQLite 库，不会串到别的群或私聊。',
     parameters: {
       type: 'object',
       properties: {
         query: { type: 'string', description: '要回忆的关键词；多个词用空格分开，表示同时包含' },
-        limit: { type: 'integer', description: '最多返回几条，默认 30，最多 100' },
+        hits: { type: 'integer', description: '命中点数，默认 5，最多 20；第一次不用传' },
+        around: { type: 'integer', description: '每个命中点前后各带几条，默认 2，最多 8；语境不够再扩大' },
         after: { type: 'string', description: '只查这个日期/时间之后，如 2026-10-01' },
         before: { type: 'string', description: '只查这个日期/时间之前，如 2026-10-30' },
       },
@@ -184,9 +186,10 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
         properties: {
           ok: { type: 'boolean' },
           count: { type: 'integer' },
+          hitCount: { type: 'integer' },
           text: { type: 'string' },
         },
-        required: ['ok', 'count', 'text'],
+        required: ['ok', 'count', 'hitCount', 'text'],
         additionalProperties: false,
       },
       render: (_args, value) => [{ type: 'text', text: String(value?.text ?? '（没有记录）') }],
@@ -194,17 +197,19 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     async execute(args, exec) {
       const record = needRecord(manager, exec)
       try {
-        const rows = await searchConversation(record.dir, {
+        const result = await searchConversationWindows(record.dir, {
           ...(args ?? {}),
           selfId: manager.selfId || config.selfId || '',
         })
+        const count = result.windows.reduce((sum, window) => sum + window.rows.length, 0)
+        const hitCount = result.hits.length
         const title = String(args?.query ?? '').trim()
-          ? `当前${record.scope === 'group' ? '群' : '私聊'}中与「${String(args.query).trim()}」相关的 ${rows.length} 条原话（新→旧）：`
-          : `当前${record.scope === 'group' ? '群' : '私聊'}最近 ${rows.length} 条原话（新→旧）：`
-        return { ok: true, count: rows.length, text: `${title}\n${formatConversationRows(rows)}` }
+          ? `当前${record.scope === 'group' ? '群' : '私聊'}中与「${String(args.query).trim()}」相关：${hitCount} 个命中点，展开为 ${count} 条原话（★ = 命中点，片段内旧→新）：`
+          : `当前${record.scope === 'group' ? '群' : '私聊'}最近 ${count} 条原话（旧→新）：`
+        return { ok: true, count, hitCount, text: `${title}\n${formatConversationWindows(result.windows)}` }
       } catch (err) {
         logger.warn?.(`qq_history 查询失败: ${err?.message ?? err}`)
-        return { ok: false, count: 0, text: `历史对话查询失败：${err?.message ?? err}` }
+        return { ok: false, count: 0, hitCount: 0, text: `历史对话查询失败：${err?.message ?? err}` }
       }
     },
   })
