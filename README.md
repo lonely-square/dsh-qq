@@ -130,7 +130,7 @@ dsh plugin --profile desktop why dsh-qq-onebot
 | `groupReplyGapMs` | `20000` | 觉得回得太密（防刷屏、防风控） |
 | `rateLimitPerMin` | `12` | 每个会话每分钟最多发几条 |
 | `contextGuard` | `true` | 不想要自动换会话就关掉 |
-| `chatLog` | `true` | 不想记原始流水就关掉 |
+| `chatLog` | `true` | 保存每个群/私聊的原始对话：Markdown 可读备份 + SQLite 检索库（Node 22+）；不想记就关掉 |
 
 **全部 50+ 项见 [docs/configuration.md](docs/configuration.md)。**
 

@@ -701,7 +701,16 @@ export function createInbound({ config, manager, logger, client, send, approval,
       const who = `${senderName}(${event.user_id})`
       appendChatLog(
         logDir,
-        { who, text: info.text || '[图片]', msgId: event.message_id },
+        {
+          who,
+          text: info.text || '[图片]',
+          msgId: event.message_id,
+          time: event.time ? new Date(Number(event.time) * 1000) : undefined,
+          role: 'user',
+          selfId,
+          senderId,
+          senderName,
+        },
         logger,
         allowed ? undefined : join(CHATLOG_DIR, UNAUTHORIZED_LOG_DIR),
       ).catch(() => {})

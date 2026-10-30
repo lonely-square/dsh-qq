@@ -25,6 +25,7 @@ import { appendFact, upsertGlossaryTerm } from './settings.js'
 import { auditOutbound } from './audit.js'
 import { lookupMeme } from './meme.js'
 import { downloadImage } from './inbound.js'
+import { formatConversationRows, searchConversation } from './conversation-db.js'
 
 /**
  * 工具直接发出去的文字也要过审计。
@@ -160,6 +161,53 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
       logger?.debug?.(`工具外发记账失败：${err?.message ?? err}`)
     }
   }
+
+  register({
+    name: 'qq_history',
+    description:
+      '检索当前这个群或当前这个私聊对象的历史原话。' +
+      '对方说「之前」「上次」「你还记得」，或当前上下文不足以回答时再用；平时聊天不用每轮查。' +
+      '不传 query 就看最近原话，传关键词就在该对象的独立 SQLite 库里查，不会串到别的群或私聊。',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: '要回忆的关键词；多个词用空格分开，表示同时包含' },
+        limit: { type: 'integer', description: '最多返回几条，默认 30，最多 100' },
+        after: { type: 'string', description: '只查这个日期/时间之后，如 2026-10-01' },
+        before: { type: 'string', description: '只查这个日期/时间之前，如 2026-10-30' },
+      },
+      additionalProperties: false,
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: {
+          ok: { type: 'boolean' },
+          count: { type: 'integer' },
+          text: { type: 'string' },
+        },
+        required: ['ok', 'count', 'text'],
+        additionalProperties: false,
+      },
+      render: (_args, value) => [{ type: 'text', text: String(value?.text ?? '（没有记录）') }],
+    },
+    async execute(args, exec) {
+      const record = needRecord(manager, exec)
+      try {
+        const rows = await searchConversation(record.dir, {
+          ...(args ?? {}),
+          selfId: manager.selfId || config.selfId || '',
+        })
+        const title = String(args?.query ?? '').trim()
+          ? `当前${record.scope === 'group' ? '群' : '私聊'}中与「${String(args.query).trim()}」相关的 ${rows.length} 条原话（新→旧）：`
+          : `当前${record.scope === 'group' ? '群' : '私聊'}最近 ${rows.length} 条原话（新→旧）：`
+        return { ok: true, count: rows.length, text: `${title}\n${formatConversationRows(rows)}` }
+      } catch (err) {
+        logger.warn?.(`qq_history 查询失败: ${err?.message ?? err}`)
+        return { ok: false, count: 0, text: `历史对话查询失败：${err?.message ?? err}` }
+      }
+    },
+  })
 
   register({
     name: 'qq_facts',
@@ -1347,7 +1395,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
   })
 
   logger.info?.(
-    `QQ 互动工具已注册：qq_facts / qq_pin / qq_poke / qq_react / qq_like / qq_send_image / qq_send_file / qq_face / qq_mface / qq_faces / qq_reply / qq_send / qq_recall / qq_group_history（表情包收藏 ${facesCount(config)} 个）`,
+    `QQ 互动工具已注册：qq_history / qq_facts / qq_pin / qq_poke / qq_react / qq_like / qq_send_image / qq_send_file / qq_face / qq_mface / qq_faces / qq_reply / qq_send / qq_recall / qq_group_history（表情包收藏 ${facesCount(config)} 个）`,
   )
   // 2026-10-30：qq_memo 是可选注册的（要配 memoryRoot），单独报一行，方便下次一眼看出这支笔通没通
   logger.info?.(

@@ -339,7 +339,14 @@ const pin = createPin({ config, logger })
     if (config.chatLog !== false) {
       const myId = manager.selfId || config.selfId || ''
       const who = myId ? `${selfName}(${myId})` : selfName
-      appendChatLog(record.dir, { who, text }, logger).catch(() => {})
+      appendChatLog(record.dir, {
+        who,
+        text,
+        role: 'agent',
+        selfId: myId,
+        senderId: myId,
+        senderName: selfName,
+      }, logger).catch(() => {})
     }
   }
 

@@ -1,5 +1,6 @@
 import { mkdir, appendFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { appendConversationMessage } from './conversation-db.js'
 
 /**
  * 聊天流水：把每一句话按时落盘，一天一个文件。
@@ -67,6 +68,13 @@ export async function appendChatLog(dir, entry = {}, logger, sub = CHATLOG_DIR) 
 
   try {
     await mkdir(join(dir, sub), { recursive: true })
+    // SQLite 是可检索的主记忆；Markdown 继续作为人能直接打开的备份。
+    await appendConversationMessage(dir, {
+      ...entry,
+      who,
+      text: said,
+      authorized: !String(sub).split(/[\\/]/).includes(UNAUTHORIZED_LOG_DIR),
+    }, logger)
     await appendFile(file, line, 'utf8')
     return true
   } catch (err) {
