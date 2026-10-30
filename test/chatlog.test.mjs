@@ -49,6 +49,18 @@ test('追加不覆盖：同一天连写两条都在', async () => {
   assert.equal(lines.length, 2)
 })
 
+test('SnowLuma 的负数 message_id 也写进流水，供 qq_images 回捞', async () => {
+  const dir = tmp()
+  await appendChatLog(dir, {
+    who: '姐姐(1)',
+    text: '[图片]',
+    msgId: -896643540,
+    time: new Date(2026, 9, 26, 1, 0, 0),
+  })
+  const body = readFileSync(join(dir, CHATLOG_DIR, `${day}.md`), 'utf8')
+  assert.ok(body.includes('#msg=-896643540'))
+})
+
 test('没目录 / 没内容：静默返回 false，绝不抛错', async () => {
   assert.equal(await appendChatLog(null, { who: 'a', text: 'x' }), false)
   const dir = tmp()

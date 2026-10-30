@@ -61,7 +61,8 @@ export async function appendChatLog(dir, entry = {}, logger, sub = CHATLOG_DIR) 
   // 图只活在看图那一秒——那一轮没被叫醒，就再也没人知道那条消息里是张什么图；
   // 留着号，事后能让 qq_images 把那条消息的图重新捞回来。
   const msgId = String(entry.msgId ?? '').trim()
-  const tail = /^\d+$/.test(msgId) ? ` #msg=${msgId}` : ''
+  // SnowLuma / NapCat 的 message_id 可能是负数，不能只记录正数。
+  const tail = /^-?\d+$/.test(msgId) && msgId !== '0' ? ` #msg=${msgId}` : ''
   const line = `- ${clockOf(time)} · ${who}：${body}${tail}\n`
 
   try {

@@ -501,6 +501,47 @@ export function createInboundMessage(body, imageAttachments = []) {
   })
 }
 
+/**
+ * 群里常见的顺序是「先发表情，再单独 @ 机器人」。前一条没有叫醒机器人，
+ * 但图片 URL 不能跟着那次 return 一起丢掉；短暂记住同一发送者的图片，等
+ * 下一条真正叫醒机器人时一起交给附件服务。按发送者隔离，避免串到别人的图。
+ */
+export function createPendingImageBuffer({ ttlMs = 2 * 60_000, maxUrls = 4, now = Date.now } = {}) {
+  const entries = new Map()
+  const keyOf = (peerId, senderId) => `${String(peerId)}:${String(senderId)}`
+
+  function prune() {
+    const current = now()
+    for (const [key, entry] of entries) {
+      if (current - entry.at > ttlMs) entries.delete(key)
+    }
+  }
+
+  return {
+    remember({ peerId, senderId, messageId, urls }) {
+      const incoming = (Array.isArray(urls) ? urls : []).map(String).filter(Boolean)
+      if (incoming.length === 0) return
+      prune()
+      const key = keyOf(peerId, senderId)
+      const previous = entries.get(key)
+      const combined = [...new Set([...(previous?.urls ?? []), ...incoming])].slice(-maxUrls)
+      const id = Number(messageId)
+      entries.set(key, {
+        urls: combined,
+        messageId: Number.isFinite(id) && id !== 0 ? id : previous?.messageId ?? null,
+        at: now(),
+      })
+    },
+    take({ peerId, senderId }) {
+      prune()
+      const key = keyOf(peerId, senderId)
+      const entry = entries.get(key)
+      entries.delete(key)
+      return entry ?? { urls: [], messageId: null, at: 0 }
+    },
+  }
+}
+
 /** 清掉缓存里太老的图，避免堆成垃圾场。 */
 async function pruneCache(cacheDir, keepFiles = 200) {
   try {
@@ -544,6 +585,7 @@ export function createInbound({ config, manager, logger, client, send, approval,
   // 连发合并：同一个 peer 的几条消息攒在一起回。
   // 键是「谁发的」，值是正在等的这一批（bodies 是各自已经拼好的正文）。
   const mergeBatches = new Map()
+  const pendingImages = createPendingImageBuffer()
 
   /**
    * 投递一轮。单条消息和「连发合并」后的整段，走的是同一条路。
@@ -622,6 +664,7 @@ export function createInbound({ config, manager, logger, client, send, approval,
     const scope = isGroup ? 'group' : 'private'
     const peerId = String(isGroup ? event.group_id : event.user_id)
     const sender = event.sender ?? {}
+    const senderId = String(event.user_id ?? '')
     const senderName = sender.card || sender.nickname || peerId
     const label = isGroup ? `群 ${peerId}` : `私聊 ${senderName}(${peerId})`
     const ownerInfo = { isOwner: ownerIds.has(String(event.user_id ?? '')), ownerLabel }
@@ -632,6 +675,16 @@ export function createInbound({ config, manager, logger, client, send, approval,
 
     const allowed = isGroup ? allowGroup(config, peerId) : allowPrivate(config, peerId)
     const info = readMessage(event.message, { selfId, selfName: event.self_name ?? '机器人' })
+    // 重放事件本身稍后会直接处理 info.images；不要再次塞回暂存区，
+    // 否则「表情 → @」已经消费后，gap replay 还可能让它重复出现。
+    if (isGroup && !isReplay && info.images.length > 0) {
+      pendingImages.remember({
+        peerId,
+        senderId,
+        messageId: event.message_id,
+        urls: info.images,
+      })
+    }
 
     // 合并转发：卡片里的内容真的取出来，摆进正文，别只留一个「[合并转发]」。
     // 取不到就保留占位——至少让人知道这里本来有东西。
@@ -669,8 +722,6 @@ export function createInbound({ config, manager, logger, client, send, approval,
     ) {
       return
     }
-
-    const senderId = String(event.user_id ?? '')
 
     // 先用「上一条的时间」判断停没停，再把这条记进去 —— 连着聊才续期。
     const idleExceeded = isGroup && wakeIdleExceeded(config, peerId, senderId)
@@ -838,6 +889,17 @@ export function createInbound({ config, manager, logger, client, send, approval,
     }
 
     let record = await manager.obtain({ scope, peerId, label })
+    const pendingImageBatch = isGroup
+      ? pendingImages.take({ peerId, senderId })
+      : { urls: [], messageId: null }
+    const imageUrls = [...new Set([...(pendingImageBatch.urls ?? []), ...info.images])].slice(0, 4)
+    const currentMessageId = Number(event.message_id)
+    const latestImageMessageId =
+      pendingImageBatch.messageId ??
+      (info.images.length > 0 && Number.isFinite(currentMessageId) && currentMessageId !== 0
+        ? currentMessageId
+        : null)
+    if (latestImageMessageId !== null) record.lastImageMessageId = latestImageMessageId
     // 有人说话了：冷场计时要清零，主动说话那层也知道「这会儿不缺人」
     wake?.noteInbound?.(record)
 
@@ -914,11 +976,11 @@ export function createInbound({ config, manager, logger, client, send, approval,
 
     // ── 图片：下载到本地，把路径交给 agent ──
     let imagePaths = []
-    if (info.images.length > 0) {
+    if (imageUrls.length > 0) {
       await mkdir(cacheDir, { recursive: true }).catch(() => {})
-      imagePaths = (await Promise.all(info.images.slice(0, 4).map((u) => downloadImage(u, cacheDir, maxMB)))).filter(Boolean)
+      imagePaths = (await Promise.all(imageUrls.map((u) => downloadImage(u, cacheDir, maxMB)))).filter(Boolean)
       if (imagePaths.length > 0) pruneCache(cacheDir)
-      else logger.warn?.(`[dsh-qq] 图片下载失败（${info.images.length} 张）`)
+      else logger.warn?.(`[dsh-qq] 图片下载失败（${imageUrls.length} 张）`)
     }
     const imageAttachments = await saveImageAttachments(imagePaths, attachments, logger)
 
@@ -1046,7 +1108,7 @@ export function createInbound({ config, manager, logger, client, send, approval,
       )
       const hint = faceCollectRule(config)
       if (hint) parts.push(hint)
-    } else if (info.images.length > 0) {
+    } else if (imageUrls.length > 0) {
       parts.push('[用户发了图片，但没能下载下来]')
     }
 

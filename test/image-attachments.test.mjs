@@ -6,6 +6,7 @@ import test from 'node:test'
 
 import {
   createInboundMessage,
+  createPendingImageBuffer,
   detectImageMediaType,
   saveImageAttachments,
 } from '../src/inbound.js'
@@ -65,4 +66,32 @@ test('附件服务不可用时安全降级，不让图片拖垮文字消息', as
   }, { warn: (line) => warnings.push(line) })
   assert.deepEqual(refs, [])
   assert.equal(warnings.length, 1)
+})
+
+test('群里先发表情再单独 @：同一发送者的图片会留给下一轮', () => {
+  let time = 1000
+  const pending = createPendingImageBuffer({ now: () => time })
+  pending.remember({
+    peerId: '100',
+    senderId: '200',
+    messageId: -896643540,
+    urls: ['https://example.test/sticker.png'],
+  })
+
+  assert.deepEqual(pending.take({ peerId: '100', senderId: '200' }), {
+    urls: ['https://example.test/sticker.png'],
+    messageId: -896643540,
+    at: 1000,
+  })
+  assert.deepEqual(pending.take({ peerId: '100', senderId: '200' }).urls, [])
+})
+
+test('待看图片按群和发送者隔离，并会过期', () => {
+  let time = 1000
+  const pending = createPendingImageBuffer({ ttlMs: 5000, now: () => time })
+  pending.remember({ peerId: '100', senderId: '200', messageId: 1, urls: ['https://example.test/a.png'] })
+  assert.deepEqual(pending.take({ peerId: '100', senderId: '201' }).urls, [])
+
+  time = 7001
+  assert.deepEqual(pending.take({ peerId: '100', senderId: '200' }).urls, [])
 })

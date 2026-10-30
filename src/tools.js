@@ -590,8 +590,9 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
     async execute(args, exec) {
       const record = needRecord(manager, exec)
-      const messageId = Number(args?.message_id ?? record.lastMessageId ?? 0)
-      if (!Number.isFinite(messageId) || messageId <= 0) {
+      const messageId = Number(args?.message_id ?? record.lastImageMessageId ?? record.lastMessageId ?? 0)
+      // SnowLuma / NapCat 的 message_id 是有符号 32 位整数，负数同样合法。
+      if (!Number.isFinite(messageId) || messageId === 0) {
         throw new Error('qq_images: 不知道要看哪条消息')
       }
 
