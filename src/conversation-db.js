@@ -75,12 +75,12 @@ function parseMarkdownLine(day, line) {
   }
 }
 
-/** 首次建库时把旧 Markdown 原话导入；只导一次，不做模型总结。 */
-function importMarkdownOnce(db, dir, selfId = '') {
-  const imported = db.prepare("SELECT value FROM metadata WHERE key = 'markdown_import_v1'").get()
+/** 把一个会话目录里的 Markdown 原话导入；每个来源只导一次，不做模型总结。 */
+function importMarkdownOnce(db, targetDir, sourceDir, selfId = '', metadataKey = 'markdown_import_v1') {
+  const imported = db.prepare('SELECT value FROM metadata WHERE key = ?').get(metadataKey)
   if (imported) return 0
 
-  const root = join(dir, '聊天记录')
+  const root = join(sourceDir, '聊天记录')
   const files = []
   const collect = (folder, authorized) => {
     if (!existsSync(folder)) return
@@ -97,16 +97,29 @@ function importMarkdownOnce(db, dir, selfId = '') {
       (occurred_at, role, sender_id, sender_name, who, text, message_id, authorized, source, source_key)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'markdown', ?)
   `)
+  const byMessageId = db.prepare('SELECT 1 FROM messages WHERE message_id = ? LIMIT 1')
+  const byExactText = db.prepare(`
+    SELECT 1 FROM messages
+    WHERE occurred_at = ? AND sender_id = ? AND who = ? AND text = ?
+    LIMIT 1
+  `)
   let count = 0
   db.exec('BEGIN IMMEDIATE')
   try {
     for (const file of files.sort((a, b) => a.path.localeCompare(b.path))) {
       const day = file.path.slice(-13, -3)
-      const rel = relative(dir, file.path)
+      const rel = relative(sourceDir, file.path)
       const lines = readFileSync(file.path, 'utf8').split(/\r?\n/)
       for (let index = 0; index < lines.length; index += 1) {
         const parsed = parseMarkdownLine(day, lines[index])
         if (!parsed?.text) continue
+        // 工作区搬迁时两边可能各留了一份流水。消息号是最可靠的身份；老流水没有
+        // 消息号时再用完整原话四元组兜底，避免合库后重复返回。
+        if (parsed.messageId && byMessageId.get(parsed.messageId)) continue
+        if (byExactText.get(parsed.occurredAt, parsed.senderId, parsed.who, parsed.text)) continue
+        const sourceKey = sourceDir === targetDir
+          ? `markdown:${rel}:${index + 1}`
+          : `markdown-v2:${file.path}:${index + 1}`
         const result = insert.run(
           parsed.occurredAt,
           selfId && parsed.senderId === String(selfId) ? 'agent' : 'user',
@@ -116,14 +129,12 @@ function importMarkdownOnce(db, dir, selfId = '') {
           parsed.text,
           parsed.messageId,
           file.authorized,
-          `markdown:${rel}:${index + 1}`,
+          sourceKey,
         )
         count += Number(result.changes) || 0
       }
     }
-    db.prepare("INSERT OR REPLACE INTO metadata(key, value) VALUES ('markdown_import_v1', ?)").run(
-      new Date().toISOString(),
-    )
+    db.prepare('INSERT OR REPLACE INTO metadata(key, value) VALUES (?, ?)').run(metadataKey, new Date().toISOString())
     db.exec('COMMIT')
   } catch (err) {
     db.exec('ROLLBACK')
@@ -132,13 +143,17 @@ function importMarkdownOnce(db, dir, selfId = '') {
   return count
 }
 
-async function open(dir, { selfId = '' } = {}) {
+async function open(dir, { selfId = '', legacyDirs = [] } = {}) {
   const mod = await sqlite()
   if (!mod?.DatabaseSync) throw new Error('当前 Node 不支持 node:sqlite（需要 Node 22+）')
   const db = new mod.DatabaseSync(join(dir, CONVERSATION_DB))
   try {
     init(db)
-    importMarkdownOnce(db, dir, selfId)
+    importMarkdownOnce(db, dir, dir, selfId)
+    for (const legacyDir of [...new Set(legacyDirs.map(String))]) {
+      if (!legacyDir || legacyDir === dir || !existsSync(join(legacyDir, '聊天记录'))) continue
+      importMarkdownOnce(db, dir, legacyDir, selfId, `markdown_import_v2:${legacyDir}`)
+    }
     return db
   } catch (err) {
     db.close()
@@ -242,7 +257,7 @@ function queryRows(db, options = {}) {
 export async function searchConversation(dir, options = {}) {
   if (!dir) throw new Error('当前会话没有独立目录')
   return serial(dir, async () => {
-    const db = await open(dir, { selfId: options.selfId })
+    const db = await open(dir, { selfId: options.selfId, legacyDirs: options.legacyDirs })
     try {
       return queryRows(db, options)
     } finally {
@@ -275,11 +290,11 @@ function rowsAround(db, hit, around) {
  */
 export async function searchConversationWindows(
   dir,
-  { query = '', hits = 5, around = 2, before = '', after = '', selfId = '' } = {},
+  { query = '', hits = 5, around = 2, before = '', after = '', selfId = '', legacyDirs = [] } = {},
 ) {
   if (!dir) throw new Error('当前会话没有独立目录')
   return serial(dir, async () => {
-    const db = await open(dir, { selfId })
+    const db = await open(dir, { selfId, legacyDirs })
     try {
       const hitLimit = Math.min(Math.max(1, Number(hits) || 5), 20)
       const radius = Math.min(Math.max(0, Number(around) || 2), 8)

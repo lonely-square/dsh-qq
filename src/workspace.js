@@ -1,5 +1,7 @@
 import { mkdir, writeFile, access, readFile, appendFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join, resolve } from 'node:path'
 
 /**
  * 每个 QQ 会话（私聊 / 群）各自的独立工作目录。
@@ -28,6 +30,34 @@ export function resolvePeerWorkspace(config, scope, peerId) {
     String(config.workspaceRoot ?? '').trim() ||
     join(String(config.cwd ?? '').trim() || process.cwd(), '会话')
   return join(root, peerDirName(scope, peerId))
+}
+
+/**
+ * 找出这个对象在旧 DSH 工作区里留下的会话目录。
+ *
+ * workspaceRoot 改过以后，同一个群的 Markdown 可能还躺在原工作区。DSH 的工作区
+ * 注册表保存了这些根目录；这里只取同名 peer 目录，绝不把别的群/私聊混进来。
+ */
+export function resolveLegacyPeerWorkspaces(config, scope, peerId, currentDir = '') {
+  const peer = peerDirName(scope, peerId)
+  const current = currentDir ? resolve(currentDir) : ''
+  const candidates = new Set()
+  const addRoot = (root) => {
+    const value = String(root ?? '').trim()
+    if (value) candidates.add(resolve(value, '会话', peer))
+  }
+
+  addRoot(config?.cwd)
+  try {
+    const registry = JSON.parse(readFileSync(join(homedir(), '.dsh', 'storages', 'workspace.json'), 'utf8'))
+    for (const workspace of Object.values(registry?.tables?.workspaces ?? {})) addRoot(workspace?.path)
+  } catch {
+    // 注册表不存在或正在写入时不影响聊天；当前目录仍照常可查。
+  }
+
+  return [...candidates]
+    .filter((dir) => dir !== current && existsSync(join(dir, '聊天记录')))
+    .sort()
 }
 
 async function exists(path) {

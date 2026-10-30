@@ -26,6 +26,7 @@ import { auditOutbound } from './audit.js'
 import { lookupMeme } from './meme.js'
 import { downloadImage } from './inbound.js'
 import { formatConversationWindows, searchConversationWindows } from './conversation-db.js'
+import { resolveLegacyPeerWorkspaces } from './workspace.js'
 
 /**
  * 工具直接发出去的文字也要过审计。
@@ -197,9 +198,16 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     async execute(args, exec) {
       const record = needRecord(manager, exec)
       try {
+        const legacyDirs = resolveLegacyPeerWorkspaces(
+          config,
+          record.scope,
+          record.peerId,
+          record.dir,
+        )
         const result = await searchConversationWindows(record.dir, {
           ...(args ?? {}),
           selfId: manager.selfId || config.selfId || '',
+          legacyDirs,
         })
         const count = result.windows.reduce((sum, window) => sum + window.rows.length, 0)
         const hitCount = result.hits.length

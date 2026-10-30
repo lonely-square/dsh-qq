@@ -67,6 +67,25 @@ sqliteTest('首次建库会导入旧 Markdown，未开通流水不进正常检�
   assert.equal((await searchConversation(dir, { query: '不应该', selfId: '2' })).length, 0)
 })
 
+sqliteTest('工作区迁移后会合并同一对象的旧流水，并按消息号去重', async () => {
+  const current = tmp()
+  const legacy = tmp()
+  mkdirSync(join(current, '聊天记录'), { recursive: true })
+  mkdirSync(join(legacy, '聊天记录'), { recursive: true })
+  writeFileSync(join(current, '聊天记录', '2026-10-30.md'),
+    '- 10:00:00 · alpha(1)：今天吃火锅 #msg=200\n')
+  writeFileSync(join(legacy, '聊天记录', '2026-10-29.md'), [
+    '- 16:07:47 · alpha(1)：我喜欢吃三文鱼 #msg=100',
+    '- 16:07:47 · alpha(1)：我喜欢吃三文鱼 #msg=100',
+    '',
+  ].join('\n'))
+
+  // 先模拟旧版已经只导入当前目录；之后再传旧目录，也必须补迁移。
+  assert.equal((await searchConversation(current, { query: '吃' })).length, 1)
+  const rows = await searchConversation(current, { query: '吃', legacyDirs: [legacy] })
+  assert.deepEqual(rows.map((row) => row.text).sort(), ['今天吃火锅', '我喜欢吃三文鱼'])
+})
+
 sqliteTest('同一 OneBot message_id 重放不重复入库', async () => {
   const dir = tmp()
   const entry = { who: '姐姐(1)', text: '只记一次', role: 'user', msgId: 88 }
