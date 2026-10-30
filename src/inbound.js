@@ -158,9 +158,8 @@ function wakeAlive(groupId, userId) {
   return until > Date.now()
 }
 
-/** 每个人上一条消息的时间：判断「连着聊」还是「人已经走开了」。
- *  2026-10-25 姐姐定的：窗里说话跟上一条隔得比 groupWakeIdleMs 久，窗就当场关 ——
- *  不然群里隔三四十秒插一句也会一直续着，「被 @ 了就停不下来」。 */
+/** 每个人上一条消息的时间：仅在显式配置 groupWakeIdleMs 时用于提前关窗。
+ *  默认不启用；否则 5 秒门槛会把对外宣称的「一分钟免 @」悄悄缩成 5 秒。 */
 const groupLastMsgAt = new Map()
 
 /** 距这个人上一条消息超过续期门槛了没（0 = 关掉这个门槛，永远不算超）。 */
@@ -845,7 +844,7 @@ export function createInbound({ config, manager, logger, client, send, approval,
       // 群友要 @ 才理，主人却随时都接，一是不公平，二是「唤醒一次后超时也没停」。
       // 现在主人也走窗口，只是窗口是 60 秒（群友提的方案），窗口内说话照样续期。
       if (!quotedMe && !addressedBy) {
-        // 停太久：窗里也当没窗了 —— 「5 秒内没接话就关」（2026-10-25 姐姐定）。
+        // 可选提前关窗；默认关闭，让每个群友各自的 60 秒保活完整生效。
         if (idleExceeded) {
           closeWake(peerId, senderId)
           logger.debug?.(`[dsh-qq] 群 ${peerId} 保活窗里停太久（>${config.groupWakeIdleMs}ms），窗关掉，跳过`)

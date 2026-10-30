@@ -103,6 +103,7 @@ const config = Config({
   peerBots: ['10002'], // 测试里把「另一个机器人」登记成同类，才测得了「开关关着不接」
   contextSwapMinTokens: 1000,
 })
+assert.equal(config.groupWakeIdleMs, 0, '默认不能用更短的 idle 门槛架空一分钟保活窗')
 
 apply(ctx, config)
 await waitFor(() => mock.clientCount === 1, { what: '插件连上假 OneBot 服务端' })
@@ -532,8 +533,7 @@ assert.match(textOf(agent4.received[afterIn]), /那说个事/, '被压住的那�
 config.groupReplyGapMs = 0
 console.log('✓ 被间隔压住的消息到点自己补回（不靠下一句）')
 
-// —— 保活窗「停太久就关」：连着聊才续（2026-10-25 姐姐定）——
-// 窗里说话跟上一条隔得比 groupWakeIdleMs 久，窗就当场关 —— 不然群友隔几十秒插一句也一直续着。
+// —— 显式开启可选 idle 门槛时，保活窗才会提前关闭 ——
 config.groupWakeIdleMs = 300
 const beforeIdle = created.length
 mock.emitGroupText({ groupId: 88892, userId: 779, nickname: '路人丙', text: '@机器人 说个话', messageId: 521, atSelf: true })
@@ -547,8 +547,8 @@ await sleep(600) // 超过 300ms 门槛
 mock.emitGroupText({ groupId: 88892, userId: 779, nickname: '路人丙', text: '隔了半天又来', messageId: 523 })
 await sleep(400)
 assert.equal(agent5.received.length, beforeIdle2, '停太久之后窗该关，这句不该接')
-config.groupWakeIdleMs = 5000
-console.log('✓ 保活窗停太久自动关（连着聊才续）')
+config.groupWakeIdleMs = 0
+console.log('✓ 显式开启 idle 门槛时才提前关窗；默认保留完整一分钟')
 
 // —— 跳过的群消息也要进上下文（2026-10-24 群里实测踩的坑）——
 // 群友 A 说了个梗没 @ 我们 → 跳过；两分钟后主人接一句同款的话，

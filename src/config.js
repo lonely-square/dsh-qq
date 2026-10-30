@@ -129,9 +129,9 @@ export const ConfigSchema = Schema.object({
     .default(60000)
     .description('群里被 @ 过一次之后，多久内不用再 @ 也能接话，单位毫秒（0 = 关闭；2026-10-24 按群友的建议从 5 分钟改成 1 分钟）'),
   groupWakeIdleMs: Schema.number()
-    .default(5000)
+    .default(0)
     .description(
-      '保活窗的续期门槛，单位毫秒（0 = 关闭，退回「窗内每句都续期」）。窗里说话跟上一条隔得比这更久，窗就当场关掉——连着聊才续，一停顿就散场，2026-10-25 姐姐定的',
+      '可选的保活窗提前关闭门槛，单位毫秒（默认 0 = 关闭）。开启后，两句话间隔超过此值会提前关窗；通常保持 0，让 groupWakeMs 的一分钟窗口完整生效',
     ),
   groupRepliesPerWindow: Schema.number()
     .default(0)
