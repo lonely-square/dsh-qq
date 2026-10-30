@@ -2,6 +2,18 @@
 
 本文件记录 dsh-qq 的版本变更。格式照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号照 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 修复
+
+- QQ 图片优先写入 DSH 原生附件服务，并作为多模态图片块随同一条用户消息交给模型，不再把 `read_image` 当作唯一读图入口；老宿主没有附件服务时仍保留路径降级，失败也不会拖垮文字消息。
+- 同一进程内只保留一个非 `uiOnly` 的 OneBot 运行实例。热重载或插件图重建时，新实例会先释放旧 WebSocket、计时器和会话监听，避免一条 QQ 消息被重复消费两三次。
+
+### 工程化
+
+- 新增 Node 20/22/24 CI、锁定依赖安装、完整测试和 `npm pack --dry-run` 检查。
+- 新增标签发布流水线：版本校验、测试、`.tgz` 打包、SHA-256 校验和 GitHub Release；fork 不自动发布 npm。
+
 ## [1.2.8] - 2026-10-30
 
 > 版本号从 1.2.4 直接跳到 1.2.8：1.2.5–1.2.7 只在本地打过包、没发到 npm（`npm view dsh-qq-onebot version` 当时还是 1.2.2），这里一次补齐，免得别人看到「装到的是 1.2.8、CHANGELOG 里没有」又得猜。
