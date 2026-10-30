@@ -82,7 +82,7 @@ const LEAK_LINE = [
   // 但 `I'll go:` / `I'll do:` / `I'll write:` 后头跟的往往是**定稿**，整行丢会把话说没，
   // 所以这几种交给 LEAD_LABEL 剥标签留话；这里只拦真正纯自评的 `I should / I will / I think`。
   /^I (?:should|will|need to|think|guess)\b/i,
-  // 2026-10-26 22:20：老三照事实卡写便签时，模型把卡里的规矩当成「语言维度」标注漏进正文
+  // 2026-10-26 22:20：模型把内部规矩当成「语言维度」标注漏进正文
   // ——`"遗书" language.` 原样发到了 QQ 上。引号里一个词 + language/style/tone 是 meta，
   // 不是话，整行丢。
   /^(?:use\s+)?["'「『“‘][^"'」』”’]{1,16}["'」』”’]\s*(?:language|lang|style|tone|wording)\b\s*\.?\s*$/i,

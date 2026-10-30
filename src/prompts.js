@@ -16,7 +16,7 @@
  *    `personaLeaks()` 会检测这类混入，只报警不阻止。
  *
  * 拼装顺序（越靠后越不容易被冲淡）：
- *   协议层 → 事实卡 → groupPrompt/directPrompt → 人设层（persona + SELF_KNOWN_RULE）
+ *   协议层 → 群词典/群尾巴 → groupPrompt/directPrompt → 人设层（persona + SELF_KNOWN_RULE）
  *   → 表情包（最最后，它最容易变成「每句都配图」）
  */
 import { renderGijinka } from './gijinka.js'
@@ -217,7 +217,6 @@ const TOOL_TOKENS = [
   'qq_react',
   'qq_like',
   'qq_recall',
-  'qq_facts',
   'read_image',
   '[SILENT]',
   'SILENT_MARKER',
@@ -246,8 +245,6 @@ export function buildChatPrompt(
     isGroup,
     isOwner = false,
     faces = null,
-    facts = '',
-    factsFile = '',
     glossary = '',
     glossaryFile = '',
     groupDigest = '',
@@ -269,18 +266,6 @@ export function buildChatPrompt(
   // 同类机器人：群里有「吵架」那套规矩，私聊里换成「别客套套娃」（2026-10-29 加）。
   if (config?.botChatEnabled) parts.push('', isGroup ? PEER_BOT_RULES : PEER_BOT_DM_RULES)
   if (owners.length > 0 && (isGroup || isOwner)) parts.push('', ownerRules(config?.ownerLabel, { isGroup }))
-
-  // 事实卡：跟协议无关，但它比人设更「事」，所以放在协议之后、人设之前。
-  const factText = String(facts ?? '').trim()
-  if (factText) {
-    parts.push(
-      '',
-      '【事实卡·跟她聊天要记住的事】',
-      factText,
-      '[事实卡结束]',
-      `这些是跟她聊天时要记住的事，不用念出来、不用复述。她说「记一下」才改卡：用 write 工具改 \`${String(factsFile || '').trim() || '事实卡.md'}\` 里对应那节，一次只加一行，别自己删改别的内容。`,
-    )
-  }
 
   // 群词典：这个群自己的黑话、缩写、谁是谁。
   //    插件每 20 分钟扫一遍群记录，把它「没接住的地方」追加进会话目录的 `记忆区/群词典.md`。
@@ -324,7 +309,7 @@ export function buildChatPrompt(
     )
   }
 
-  // AI 娘图鉴：跟事实卡同一类「事」——群友说的那个名字指的是谁。
+  // AI 娘图鉴：群友说的那个名字指的是谁。
   //    它是跨群共享的常识，不跟某个会话绑定，所以内置在插件里、由 aiGirls 开关控制。
   if (config?.aiGirls !== false) {
     const gijinkaText = renderGijinka()
@@ -362,7 +347,7 @@ export function buildChatPrompt(
     '',
     '【发出去之前】斟酌放在思考里，正文只放你要对她说的话。同一句话想清楚了就落笔，别在思考里过完、正文里再写一遍——英文自评、改一版再发的旧版、同一句话的几种说法，都别带出去。',
     // 2026-10-26 22:20：老三用写文件的工具改便签，把「## 下次接着说什么 / - 条目」念进了聊天正文，
-    // 末尾还漏了一句 `"遗书" language.`（模型给事实卡里的规矩打了维度标签，原样发到 QQ）。
+    // 末尾还漏了一句 `"遗书" language.`（模型给内部规矩打了维度标签，原样发到 QQ）。
     // 写进文件的是文件，不是要说的话——正文只说「写好了、改了哪段」。
     '还有：用工具写文件（便签、日记、记忆区）的时候，文件里的标题、小节、列表是给文件看的，不是正文——别原样复述给她，也别在正文里标注「这句属于什么维度」。正文就一句：写好了，加了什么。',
     // 2026-10-27：调工具之前那句「让我先 glob 一下」「要不要现在读」「好，一句。发。」

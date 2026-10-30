@@ -21,7 +21,7 @@ import { mkdir } from 'node:fs/promises'
 import { join, dirname, resolve, relative, isAbsolute } from 'node:path'
 
 import { pickFace, keepFace, facesCount, faceSendState, markFaceSent, listFaces } from './faces.js'
-import { appendFact, upsertGlossaryTerm } from './settings.js'
+import { upsertGlossaryTerm } from './settings.js'
 import { auditOutbound } from './audit.js'
 import { lookupMeme } from './meme.js'
 import { downloadImage } from './inbound.js'
@@ -217,53 +217,6 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
       } catch (err) {
         logger.warn?.(`qq_history 查询失败: ${err?.message ?? err}`)
         return { ok: false, count: 0, hitCount: 0, text: `历史对话查询失败：${err?.message ?? err}` }
-      }
-    },
-  })
-
-  register({
-    name: 'qq_facts',
-    description:
-      '读写自己的事实卡（跨压缩还记得的关键事实：姐姐怎么称呼、作息、禁忌、正在做的事）。' +
-      '只有姐姐说「记一下」时才用 append 往当前会话那一节加一行；平时不用调 read——事实卡已经在你面前的提示里了。',
-    parameters: {
-      type: 'object',
-      properties: {
-        action: { type: 'string', enum: ['read', 'append'], description: 'read=看一眼现在的全文；append=加一行' },
-        text: { type: 'string', description: 'append 时要记的那一行（短，一句话）' },
-      },
-      required: ['action'],
-      additionalProperties: false,
-    },
-    output: {
-      schema: {
-        type: 'object',
-        properties: { ok: { type: 'boolean' }, file: { type: 'string' }, text: { type: 'string' } },
-        required: ['ok'],
-        additionalProperties: false,
-      },
-      render: (_args, value) => [
-        { type: 'text', text: value.ok ? `事实卡已更新：${String(value.text ?? '').slice(0, 60)}` : '事实卡没写成（看一眼日志）' },
-      ],
-    },
-    async execute(args, exec) {
-      const record = needRecord(manager, exec)
-      const file = join(dirname(String(record.dir ?? '')), '事实卡.md')
-      if (args?.action === 'read') {
-        try {
-          const { readFileSync } = await import('node:fs')
-          return { ok: true, file, text: readFileSync(file, 'utf8') }
-        } catch {
-          return { ok: false, file, text: '' }
-        }
-      }
-      if (args?.action !== 'append') throw new Error('qq_facts: action 只能是 read 或 append')
-      try {
-        appendFact(file, record.label, args?.text)
-        return { ok: true, file, text: String(args?.text ?? '') }
-      } catch (err) {
-        logger.warn?.(`qq_facts 写入失败: ${err?.message ?? err}`)
-        return { ok: false, file, text: String(args?.text ?? '') }
       }
     },
   })
@@ -1407,7 +1360,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
   })
 
   logger.info?.(
-    `QQ 互动工具已注册：qq_history / qq_facts / qq_pin / qq_poke / qq_react / qq_like / qq_send_image / qq_send_file / qq_face / qq_mface / qq_faces / qq_reply / qq_send / qq_recall / qq_group_history（表情包收藏 ${facesCount(config)} 个）`,
+    `QQ 互动工具已注册：qq_history / qq_pin / qq_poke / qq_react / qq_like / qq_send_image / qq_send_file / qq_face / qq_mface / qq_faces / qq_reply / qq_send / qq_recall / qq_group_history（表情包收藏 ${facesCount(config)} 个）`,
   )
   // 2026-10-30：qq_memo 是可选注册的（要配 memoryRoot），单独报一行，方便下次一眼看出这支笔通没通
   logger.info?.(

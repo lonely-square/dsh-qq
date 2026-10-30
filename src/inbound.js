@@ -5,9 +5,7 @@ import { buildChatPrompt, faceCollectRule, IMAGE_RULES, IMAGE_TOOL_RULES, QUOTE_
 import { evaluateWakeTrigger, rollWakeProbability } from './wake-trigger.js'
 import { doorLine } from './door.js'
 import {
-  factsFileFor,
   glossaryFileFor,
-  loadFactsFor,
   loadGlossaryFor,
   loadGroupDigest,
   loadHandoffFor,
@@ -1167,8 +1165,6 @@ export function createInbound({ config, manager, logger, client, send, approval,
         isGroup,
         isOwner: ownerInfo.isOwner,
         faces: facesForPrompt(config, 12),
-        facts: loadFactsFor(record),
-        factsFile: factsFileFor(record),
         // 群词典：这个群自己的黑话。私聊传空串，别把某个群的词带进私聊。
         glossary: isGroup ? loadGlossaryFor(record) : '',
         glossaryFile: glossaryFileFor(record),

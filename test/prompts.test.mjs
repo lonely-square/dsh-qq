@@ -71,16 +71,6 @@ t('personaInSystem：人设在系统提示里时，消息里不再重复一份',
   assert.ok(!p.includes(SELF_KNOWN_RULE), 'SELF_KNOWN_RULE 说的是「上面那段」，这里上面没有人设')
 })
 
-t('事实卡在人设之前（事在协议后面、性格前面）', () => {
-  const p = buildChatPrompt(
-    { persona: PERSONA },
-    { isGroup: false, facts: '她喜欢大白饭', factsFile: '事实卡.md' },
-  )
-  const iFacts = p.indexOf('她喜欢大白饭')
-  const iPersona = p.indexOf(PERSONA)
-  assert.ok(iFacts > 0 && iPersona > iFacts)
-})
-
 t('表情包在最后', () => {
   const p = buildChatPrompt(
     { persona: PERSONA },

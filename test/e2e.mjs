@@ -89,7 +89,7 @@ const { ctx, created } = createFakeCtx()
 const config = Config({
   wsUrl: `ws://127.0.0.1:${PORT}`,
   accessToken: TOKEN,
-  // 会话文件、聊天记录、事实卡都写到临时工作区，别落进仓库的 `会话/`
+  // 会话文件和聊天记录都写到临时工作区，别落进仓库的 `会话/`
   workspaceRoot: E2E_WORKSPACE,
   requireMention: true,
   groupMode: 'open',
