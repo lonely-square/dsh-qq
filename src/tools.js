@@ -111,7 +111,17 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
   const tools = ctx.get?.('tools')
   if (!tools?.register) {
     logger.info?.('tools 服务不可用，QQ 互动工具未注册（聊天本身不受影响）')
-    return
+    return () => {}
+  }
+
+  // tools.register 在正式宿主里会返回注销句柄。把所有句柄收起来，热重载接管时
+  // 可以在旧 Cordis 上下文真正 dispose 之前先卸掉同名工具，避免新实例注册失败。
+  const disposers = []
+  const register = (definition) => {
+    const result = tools.register(definition)
+    if (typeof result === 'function') disposers.push(result)
+    else if (typeof result?.dispose === 'function') disposers.push(() => result.dispose())
+    return result
   }
 
   /**
@@ -131,7 +141,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     }
   }
 
-  tools.register({
+  register({
     name: 'qq_facts',
     description:
       '读写自己的事实卡（跨压缩还记得的关键事实：姐姐怎么称呼、作息、禁忌、正在做的事）。' +
@@ -178,7 +188,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_glossary',
     description:
       '往某个群的群词典里补一条「弄明白了的说法」。群里的黑话、缩写、谁是谁——弄懂了就记下来，下回不用重新问。' +
@@ -245,7 +255,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
       return abs
     }
 
-    tools.register({
+    register({
       name: 'qq_memo',
       description:
         '读写全家共用的那座记忆区（本地记忆区/）。注意：你自己的 write 只能落在本会话目录里，' +
@@ -325,7 +335,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     })
   }
 
-  tools.register({
+  register({
     name: 'qq_meme',
     description:
       '查一个网络梗 / 黑话 / 缩写的出处和用法。手边有一份 6668 条的梗词库快照（cnmeme.wiki，2026-10-26 建库），毫秒级。' +
@@ -378,7 +388,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_pin',
     description:
       '你自己的便签（话头，不是待办清单）：聊长了容易忘「上回说到哪儿、哪句话还没接上」，就记在这上面。' +
@@ -437,7 +447,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_poke',
     description: POKE_DESC,
     parameters: {
@@ -481,7 +491,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_react',
     description: REACT_DESC,
     parameters: {
@@ -524,7 +534,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_images',
     description: IMAGES_DESC,
     parameters: {
@@ -611,7 +621,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_like',
     description: LIKE_DESC,
     parameters: {
@@ -650,7 +660,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_send_image',
     description: IMAGE_DESC,
     parameters: {
@@ -699,7 +709,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_face',
     description: FACE_DESC,
     parameters: {
@@ -741,7 +751,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_send_file',
     description: FILE_DESC,
     parameters: {
@@ -792,7 +802,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_recall',
     description: RECALL_DESC,
     parameters: {
@@ -829,7 +839,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_reply',
     description:
       '引用某条消息再发一句话（QQ 的「回复」，气泡上会带一条原文引用）。' +
@@ -889,7 +899,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_send',
     description:
       '发一条普通消息（不带引用）。' +
@@ -961,7 +971,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_keep_face',
     description:
       '把一张本地图片收进「表情包收藏」，以后就能用 qq_mface 随机发出来。' +
@@ -1011,7 +1021,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_faces',
     description:
       '看「表情包收藏」里都有哪些图（名字 + 数量）。挑图之前先看一眼，别凭印象猜名字。' +
@@ -1056,7 +1066,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     },
   })
 
-  tools.register({
+  register({
     name: 'qq_mface',
     description:
       '发一张表情包（收藏里的图，或 QQ 商城表情）。' +
@@ -1220,7 +1230,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
   // 2026-10-26 姐姐：「老三还是看不到群聊」。私聊和群是两个会话，私聊里确实看不见群里的字。
   // 前辈 qq-bridge 也是 group:id / private:id 分开的，它给的办法是「AI 想看就自己取」——
   // 所以这里不是把群聊硬塞进私聊，而是给一只「眼睛」：想看看群里刚才聊了什么，自己调。
-  tools.register({
+  register({
     name: 'qq_group_history',
     description:
       '读某个群最近聊了什么（从落盘的聊天记录里取原话，含别人说的话）。' +
@@ -1324,4 +1334,14 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
       ? `qq_memo 已注册：能写 ${memoRootAbs}（.md / .txt）`
       : 'qq_memo 没注册：profile 里没配 memoryRoot，这支笔关着',
   )
+
+  return () => {
+    for (const dispose of disposers.reverse()) {
+      try {
+        dispose()
+      } catch {
+        /* 某些宿主会跟着 ctx 一起注销，重复释放无害 */
+      }
+    }
+  }
 }

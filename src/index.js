@@ -30,6 +30,7 @@ import {
   settingsFileOf,
 } from './settings.js'
 import { selfCheckClient } from './client-selfcheck.js'
+import { acquireRuntimeLease } from './runtime-lease.js'
 
 export const name = 'dsh-qq'
 export const inject = ['agents']
@@ -458,7 +459,27 @@ const pin = createPin({ config, logger })
   const reading = createReading({ config, manager, logger })
   // 睡着的会话不回收：回收后 tick/wake 都遍历不到它，早上攒的消息就交不出去
   manager.keeper = (record) => bedtime.isHolding(record)
-  const inbound = createInbound({ config, manager, logger, client, send, approval, questions, contextGuard, wake, sleep: bedtime, bridge, pin })
+  let attachments = null
+  try {
+    attachments = ctx.get?.('attachments') ?? ctx.attachments ?? null
+  } catch {
+    attachments = ctx.attachments ?? null
+  }
+  const inbound = createInbound({
+    config,
+    manager,
+    logger,
+    client,
+    send,
+    approval,
+    questions,
+    contextGuard,
+    wake,
+    sleep: bedtime,
+    bridge,
+    pin,
+    attachments,
+  })
   const outbound = createOutbound({ manager, config, logger, send, wake })
 
   // 群黑话 / 角色知识学习：每 20 分钟扫一次群聊记录，把「鲸鲸自己卡壳」的地方
@@ -540,13 +561,6 @@ const pin = createPin({ config, logger })
     noteDown(String(err?.message ?? err ?? ''))
   })
 
-  // 地址没配就别 start：OneBotClient 会对空 url 无限重试，日志刷屏还没结果。
-  // 填上地址后由 watchSettingsFile 那个 clientRef 回调把它拉起来。
-  if (wsUrl) {
-    client.start()
-  } else {
-    logger.info('wsUrl 还没填，先不连接 NapCat（填好并保存后会自动接上）')
-  }
   // 私聊门控：默认 allowlist，白名单空着 = 谁都不理。不说清楚，用户会以为「加了好友怎么没反应」。
   const privateAllow = listOf(config.privateAllow)
   if (config.replyToPrivate && config.privateMode === 'allowlist' && privateAllow.length === 0) {
@@ -562,12 +576,44 @@ const pin = createPin({ config, logger })
         (where ? `也可以直接改这个文件：${where}（填 "privateAllow": ["你的号"]，保存约 800ms 生效）` : ''),
     )
   }
+  let disposed = false
+  let releaseLease = () => {}
+  let disposeTools = () => {}
+  const dispose = () => {
+    if (disposed) return
+    disposed = true
+    try {
+      offSessionEvent?.()
+      offGuardEvent?.()
+      disposeLearning?.()
+    } catch {
+      /* ignore */
+    }
+    disposeTools()
+    client.stop()
+    wake.stop()
+    bedtime.stop()
+    reading.stop()
+    manager.stop()
+    approval.cancelAll()
+    questions.cancelAll()
+    releaseLease()
+  }
+
+  // 热重载时先关掉旧 WebSocket，再让新实例连接；否则一条消息会被多个上下文同时消费。
+  // 租约只需在当前进程内唯一：真正分离部署的进程各有自己的 globalThis，互不干扰；
+  // 同一进程则无论 wsUrl 是否刚被热改，都只允许一个非 uiOnly 的 QQ 消费者。
+  releaseLease = acquireRuntimeLease('onebot:active', dispose, logger)
+  ctx.on('dispose', dispose)
+
   wake.start()
   bedtime.start()
   reading.start()
 
+  // 必须在旧实例释放之后再注册：否则新旧上下文短暂重叠时，同名工具会注册失败，
+  // 接着旧上下文又被释放，最终正好一个读图/QQ 工具都不剩。
   try {
-    registerTools(ctx, { client, manager, config, logger, pin, wake, noteSelfSaid })
+    disposeTools = registerTools(ctx, { client, manager, config, logger, pin, wake, noteSelfSaid }) ?? (() => {})
   } catch (err) {
     logger.warn('QQ 互动工具注册失败（聊天本身不受影响）:', err?.message ?? err)
   }
@@ -576,21 +622,11 @@ const pin = createPin({ config, logger })
   // DSH 设置界面里那一页（client.js）打的就是这几个口。
   mountSettingsApi({ client, manager, personaRef, overridesRef })
 
-
-  ctx.on('dispose', () => {
-    try {
-      offSessionEvent?.()
-      offGuardEvent?.()
-      disposeLearning?.()
-    } catch {
-      /* ignore */
-    }
-    client.stop()
-    wake.stop()
-    bedtime.stop()
-    reading.stop()
-    manager.stop()
-    approval.cancelAll()
-    questions.cancelAll()
-  })
+  // 地址没配就别 start：OneBotClient 会对空 url 无限重试，日志刷屏还没结果。
+  // 填上地址后由 watchSettingsFile 那个 clientRef 回调把它拉起来。
+  if (wsUrl) {
+    client.start()
+  } else {
+    logger.info('wsUrl 还没填，先不连接 NapCat（填好并保存后会自动接上）')
+  }
 }

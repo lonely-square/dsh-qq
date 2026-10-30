@@ -1,7 +1,7 @@
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { readMessage } from './onebot/segment.js'
 import { rememberFaces, facesCount, facesForPrompt } from './faces.js'
-import { buildChatPrompt, faceCollectRule, IMAGE_RULES, QUOTE_DIRECTION_HINT, SILENT_HINT } from './prompts.js'
+import { buildChatPrompt, faceCollectRule, IMAGE_RULES, IMAGE_TOOL_RULES, QUOTE_DIRECTION_HINT, SILENT_HINT } from './prompts.js'
 import { evaluateWakeTrigger, rollWakeProbability } from './wake-trigger.js'
 import { doorLine } from './door.js'
 import {
@@ -15,8 +15,8 @@ import {
 import { resolvePeerWorkspace } from './workspace.js'
 import { listOf } from './config.js'
 import { appendChatLog, CHATLOG_DIR, UNAUTHORIZED_LOG_DIR } from './chatlog.js'
-import { mkdir, writeFile, readdir, unlink } from 'node:fs/promises'
-import { join, extname } from 'node:path'
+import { mkdir, readFile, writeFile, readdir, unlink } from 'node:fs/promises'
+import { basename, join, extname } from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
@@ -449,6 +449,58 @@ export async function downloadImage(url, cacheDir, maxMB) {
   }
 }
 
+/**
+ * 从文件头判断 DSH 附件服务支持的图片类型。
+ * 不信扩展名：QQ/CDN 偶尔会把 webp 叫成 .jpg，附件服务也会再次校验字节。
+ */
+export function detectImageMediaType(data) {
+  const b = data instanceof Uint8Array ? data : new Uint8Array(data ?? [])
+  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png'
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg'
+  if (b.length >= 6) {
+    const head = Buffer.from(b.subarray(0, 6)).toString('ascii')
+    if (head === 'GIF87a' || head === 'GIF89a') return 'image/gif'
+  }
+  if (
+    b.length >= 12 &&
+    Buffer.from(b.subarray(0, 4)).toString('ascii') === 'RIFF' &&
+    Buffer.from(b.subarray(8, 12)).toString('ascii') === 'WEBP'
+  ) return 'image/webp'
+  return null
+}
+
+/**
+ * 把下载好的 QQ 图片交给 DSH 的持久附件服务，得到可直接放进用户消息的引用。
+ * 失败时返回空数组，调用方保留旧的「路径 + 宿主读图能力」降级路线。
+ */
+export async function saveImageAttachments(paths, attachments, logger) {
+  if (!attachments?.saveImages || !Array.isArray(paths) || paths.length === 0) return []
+  try {
+    const inputs = []
+    for (const path of paths) {
+      const data = await readFile(path)
+      const mediaType = detectImageMediaType(data)
+      if (!mediaType) throw new Error(`不支持的图片格式：${basename(path)}`)
+      inputs.push({ data: new Uint8Array(data), mediaType, name: basename(path) })
+    }
+    return [...(await attachments.saveImages(inputs))]
+  } catch (err) {
+    logger?.warn?.(`[dsh-qq] 图片写入 DSH 附件服务失败，退回兼容模式：${err?.message ?? err}`)
+    return []
+  }
+}
+
+/** 统一构造入站用户消息，保证图片块和文字属于同一轮、同一条消息。 */
+export function createInboundMessage(body, imageAttachments = []) {
+  return createUserMessage({
+    content: [
+      { type: 'text', text: body },
+      ...imageAttachments.map((attachment) => ({ type: 'image', attachment })),
+    ],
+    source: { kind: 'user' },
+  })
+}
+
 /** 清掉缓存里太老的图，避免堆成垃圾场。 */
 async function pruneCache(cacheDir, keepFiles = 200) {
   try {
@@ -479,7 +531,7 @@ async function pruneCache(cacheDir, keepFiles = 200) {
  *
  * 触发规则全部走配置，插件自己不做「猜你还想聊」这种自作聪明的事。
  */
-export function createInbound({ config, manager, logger, client, send, approval, questions, contextGuard, wake, sleep, bridge, pin }) {
+export function createInbound({ config, manager, logger, client, send, approval, questions, contextGuard, wake, sleep, bridge, pin, attachments = null }) {
   // 没配 imageCacheDir 时落在工作目录下的「图片缓存」；每个会话再各占一层子目录（见下）
   const baseCacheDir =
     String(config.imageCacheDir ?? '').trim() ||
@@ -496,11 +548,8 @@ export function createInbound({ config, manager, logger, client, send, approval,
   /**
    * 投递一轮。单条消息和「连发合并」后的整段，走的是同一条路。
    */
-  function runTurn({ record, label, peerId, isGroup, client, body, maxTurnMs }) {
-    const message = createUserMessage({
-      content: [{ type: 'text', text: body }],
-      source: { kind: 'user' },
-    })
+  function runTurn({ record, label, peerId, isGroup, client, body, imageAttachments = [], maxTurnMs }) {
+    const message = createInboundMessage(body, imageAttachments)
     const startedAt = Date.now()
 
     manager.enqueue(record, async () => {
@@ -871,6 +920,7 @@ export function createInbound({ config, manager, logger, client, send, approval,
       if (imagePaths.length > 0) pruneCache(cacheDir)
       else logger.warn?.(`[dsh-qq] 图片下载失败（${info.images.length} 张）`)
     }
+    const imageAttachments = await saveImageAttachments(imagePaths, attachments, logger)
 
     // ── 文件：下载到本地，把路径交给 agent ──
     let filePaths = []
@@ -981,11 +1031,18 @@ export function createInbound({ config, manager, logger, client, send, approval,
     })
     if (!mustReply) parts.push(SILENT_HINT)
 
-    if (imagePaths.length > 0) {
+    if (imageAttachments.length > 0) {
       parts.push(
-        `[用户发了 ${imagePaths.length} 张图片，已存到本机，可以直接用 read_image 打开：]`,
-        ...imagePaths.map((p) => `  ${p}`),
+        `[用户发了 ${imageAttachments.length} 张图片，图片已直接附在这条消息里。]`,
         IMAGE_RULES,
+      )
+      const hint = faceCollectRule(config)
+      if (hint) parts.push(hint)
+    } else if (imagePaths.length > 0) {
+      parts.push(
+        `[用户发了 ${imagePaths.length} 张图片，已存到本机：]`,
+        ...imagePaths.map((p) => `  ${p}`),
+        IMAGE_TOOL_RULES,
       )
       const hint = faceCollectRule(config)
       if (hint) parts.push(hint)
@@ -1126,10 +1183,11 @@ export function createInbound({ config, manager, logger, client, send, approval,
       const key = `${scope}:${peerId}`
       let batch = mergeBatches.get(key)
       if (!batch) {
-        batch = { bodies: [], meta: null, timer: null }
+        batch = { bodies: [], imageAttachments: [], meta: null, timer: null }
         mergeBatches.set(key, batch)
       }
       batch.bodies.push(body)
+      batch.imageAttachments.push(...imageAttachments)
       // 用最新的 record（上下文换过会话的话，投给新那个）
       batch.meta = { record, label, peerId, isGroup, client }
       if (batch.timer) clearTimeout(batch.timer)
@@ -1137,11 +1195,16 @@ export function createInbound({ config, manager, logger, client, send, approval,
         mergeBatches.delete(key)
         const count = batch.bodies.length
         if (count > 1) logger.info?.(`[dsh-qq] ${label} 连发 ${count} 条，合并成一轮回`)
-        runTurn({ ...batch.meta, body: batch.bodies.join('\n\n'), maxTurnMs })
+        runTurn({
+          ...batch.meta,
+          body: batch.bodies.join('\n\n'),
+          imageAttachments: batch.imageAttachments,
+          maxTurnMs,
+        })
       }, windowMs)
       return
     }
 
-    runTurn({ record, label, peerId, isGroup, client, body, maxTurnMs })
+    runTurn({ record, label, peerId, isGroup, client, body, imageAttachments, maxTurnMs })
   }
 }
