@@ -714,6 +714,34 @@ const SELF_SENDING_TOOLS = new Set([
   'qq_mface',
 ])
 
+/** `qq_send` 可带 `to` 发到别处；只有发到当前会话才应该压住本轮自动正文。 */
+function toolArgsOf(data) {
+  let args = data?.input ?? data?.arguments ?? data?.args ?? data?.params ?? null
+  if (typeof args === 'string') {
+    try {
+      args = JSON.parse(args)
+    } catch {
+      return null
+    }
+  }
+  return args && typeof args === 'object' ? args : null
+}
+
+export function sendsToCurrentPeer(name, data, record) {
+  if (!SELF_SENDING_TOOLS.has(name)) return false
+  if (name !== 'qq_send') return true
+  const args = toolArgsOf(data)
+  const to = String(args?.to ?? '').trim()
+  if (!to) return true
+  const target = /^(user|group):(\d+)$/i.exec(to)
+  if (!target) return true
+  const kind = target[1].toLowerCase()
+  const id = Number(target[2])
+  return record?.scope === 'group'
+    ? kind === 'group' && id === Number(record.peerId)
+    : kind === 'user' && id === Number(record.peerId)
+}
+
 /**
  * 这一轮是不是「主动机会」（`wake.js` 的 `fire()` 投的 `【主动机会】`）。
  *
@@ -934,7 +962,7 @@ export function createOutbound({ manager, config, logger, send, wake }) {
 
     if (type === 'tool/call') {
       const name = String(data.name ?? '')
-      if (SELF_SENDING_TOOLS.has(name)) selfSent.add(sessionId)
+      if (sendsToCurrentPeer(name, data, record)) selfSent.add(sessionId)
       // 她 read 了门口的信 → 记一笔「这封拆过了」。
       // 2026-10-27 姐姐发现：她读过之后，下次提示还是「挂着 3 封没拆」——
       // 因为门口只数文件在不在，read 不会让文件消失。于是每轮都在骗她，还可能让她反复读同一封。

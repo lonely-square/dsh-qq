@@ -12,6 +12,7 @@ import {
   existsSync,
   readdirSync,
   readFileSync,
+  statSync,
   writeFileSync,
   appendFileSync,
   mkdirSync,
@@ -105,6 +106,25 @@ function peerOf(record) {
   return record.scope === 'group'
     ? { group_id: Number(record.peerId) }
     : { user_id: Number(record.peerId) }
+}
+
+/**
+ * 本地图片路径 → `base64://…`。
+ * NapCat 跑在 Docker 里时看不到宿主路径，转成 OneBot 支持的 base64 才能发出去。
+ * URL、相对路径、不存在的文件和超过 8 MiB 的文件原样返回，交给 NapCat 自己处理。
+ */
+export function imageFileArg(file) {
+  const raw = String(file ?? '').trim()
+  if (!raw) return raw
+  if (/^(?:base64|https?|file):\/\//i.test(raw)) return raw
+  if (!/^(?:\/|[A-Za-z]:[\\/])/.test(raw)) return raw
+  try {
+    if (!existsSync(raw)) return raw
+    if (statSync(raw).size > 8 * 1024 * 1024) return raw
+    return `base64://${readFileSync(raw).toString('base64')}`
+  } catch {
+    return raw
+  }
 }
 
 export function registerTools(ctx, { client, manager, config, logger, pin, wake, noteSelfSaid }) {
@@ -697,7 +717,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
       try {
         await client.call(action, {
           ...peerOf(record),
-          message: [{ type: 'image', data: { file } }],
+          message: [{ type: 'image', data: { file: imageFileArg(file) } }],
         })
         markFaceSent()
         noteToolSent(record, '[图片]')
@@ -1157,7 +1177,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
         try {
           const result = await client.call(action, {
             ...target,
-            message: [{ type: 'image', data: { file: face.path } }],
+            message: [{ type: 'image', data: { file: imageFileArg(face.path) } }],
           })
           const sentId = Number(result?.message_id ?? result?.data?.message_id ?? 0)
           if (sentId > 0) {

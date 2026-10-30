@@ -47,8 +47,8 @@ function makeHarness({ sent = [] } = {}) {
       { id: 's1' },
       { type: 'assistant/message', sessionId: 's1', data: { message } },
     )
-  const tool = (name) =>
-    onSessionEvent({ id: 's1' }, { type: 'tool/call', sessionId: 's1', data: { name } })
+  const tool = (name, data = {}) =>
+    onSessionEvent({ id: 's1' }, { type: 'tool/call', sessionId: 's1', data: { name, ...data } })
   const turnEnd = () =>
     onSessionEvent(
       { id: 's1' },
@@ -424,6 +424,23 @@ test('调过 qq_send 之后，正文不再补一遍（21:22 那条的第二半�
   await tool('qq_send')
   await fire({ content: [{ type: 'text', text: '今天这一天，本姑娘的脑子像被塞进了一整个书架' }] })
   assert.deepEqual(sent, [], '工具已经发过话了，正文不该再发一次')
+})
+
+test('qq_send 发到别处不吞当前会话正文', async () => {
+  const { fire, sent, tool } = makeHarness()
+  await tool('qq_send', { input: { to: 'group:88888', text: '发给群里的话' } })
+  await fire({ content: [{ type: 'text', text: '当前私聊仍然要回复' }] })
+  assert.deepEqual(sent, ['当前私聊仍然要回复'])
+})
+
+test('qq_send 显式发到当前私聊仍会压住重复正文', async () => {
+  const current = makeHarness()
+  current.record.peerId = '120108588'
+  await current.tool('qq_send', {
+    arguments: JSON.stringify({ to: 'user:120108588', text: '当前会话' }),
+  })
+  await current.fire({ content: [{ type: 'text', text: '不能重复发送' }] })
+  assert.deepEqual(current.sent, [])
 })
 
 test('qq_reply / qq_send_image 也算发过话', async () => {
