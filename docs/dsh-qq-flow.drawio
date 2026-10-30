@@ -1,0 +1,117 @@
+<mxfile host="Electron" modified="2026-10-30T00:00:00.000Z" agent="Codex" version="30.3.11">
+  <diagram id="dsh-qq-flow" name="DSH QQ 插件流程">
+    <mxGraphModel dx="1900" dy="1180" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="DSH QQ OneBot 插件消息与热重载流程" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=26;fontStyle=1;fontColor=#1F2937;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1840" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="修复重点：图片直接进入 DSH 原生附件链路；插件重载时旧实例主动退场" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=14;fontColor=#64748B;" vertex="1" parent="1">
+          <mxGeometry x="40" y="72" width="1840" height="24" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="lane-qq" value="QQ / NapCat (OneBot 11)" style="swimlane;html=1;startSize=34;horizontal=1;rounded=1;arcSize=8;fillColor=#E0F2FE;swimlaneFillColor=#F8FCFF;strokeColor=#38BDF8;fontColor=#075985;fontStyle=1;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="40" y="105" width="1840" height="215" as="geometry"/>
+        </mxCell>
+        <mxCell id="lane-plugin" value="dsh-qq-onebot 插件" style="swimlane;html=1;startSize=34;horizontal=1;rounded=1;arcSize=8;fillColor=#EDE9FE;swimlaneFillColor=#FCFAFF;strokeColor=#8B5CF6;fontColor=#5B21B6;fontStyle=1;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="40" y="340" width="1840" height="505" as="geometry"/>
+        </mxCell>
+        <mxCell id="lane-dsh" value="DSH Core / Agent / LLM" style="swimlane;html=1;startSize=34;horizontal=1;rounded=1;arcSize=8;fillColor=#DCFCE7;swimlaneFillColor=#FAFFFB;strokeColor=#22C55E;fontColor=#166534;fontStyle=1;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="40" y="865" width="1840" height="250" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="qq-in" value="QQ 用户发送&#xa;文字 / 图片 / 文件 / 语音" style="ellipse;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontColor=#1F2937;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="175" width="175" height="76" as="geometry"/>
+        </mxCell>
+        <mxCell id="napcat-in" value="NapCat 接收事件&#xa;OneBot WebSocket" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#FCE5CD;strokeColor=#D79B00;fontColor=#7C2D12;" vertex="1" parent="1">
+          <mxGeometry x="340" y="175" width="190" height="76" as="geometry"/>
+        </mxCell>
+        <mxCell id="napcat-out" value="NapCat 调用 QQ API&#xa;发送消息 / 图片" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#FCE5CD;strokeColor=#D79B00;fontColor=#7C2D12;" vertex="1" parent="1">
+          <mxGeometry x="1480" y="175" width="190" height="76" as="geometry"/>
+        </mxCell>
+        <mxCell id="qq-out" value="QQ 用户收到回复" style="ellipse;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontColor=#1F2937;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1720" y="182" width="130" height="62" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="runtime" value="运行租约&#xa;确保同地址仅一个活跃实例" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontColor=#1E3A5F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="590" y="385" width="210" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="gate" value="通过会话门控？&#xa;白名单 / 群模式 / @ / 去重" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontColor=#713F12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="895" y="375" width="210" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="ignored" value="忽略事件" style="ellipse;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontColor=#7F1D1D;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="392" width="130" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="parse" value="解析 OneBot 消息段&#xa;整理文字与媒体元数据" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontColor=#1E3A5F;" vertex="1" parent="1">
+          <mxGeometry x="895" y="505" width="210" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="has-image" value="含图片？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontColor=#713F12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="920" y="620" width="160" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="download" value="下载图片到受控缓存" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontColor=#1E3A5F;" vertex="1" parent="1">
+          <mxGeometry x="650" y="625" width="185" height="68" as="geometry"/>
+        </mxCell>
+        <mxCell id="attach" value="写入 DSH AttachmentStore&#xa;生成原生 image 内容块" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontColor=#4C1D5F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="390" y="615" width="200" height="88" as="geometry"/>
+        </mxCell>
+        <mxCell id="fallback" value="附件服务不可用 / 写入失败&#xa;保留本地路径兼容降级" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE5CD;strokeColor=#D79B00;fontColor=#7C2D12;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="390" y="735" width="200" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="compose" value="合成一条用户消息&#xa;text + image blocks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontColor=#1E3A5F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="620" width="190" height="78" as="geometry"/>
+        </mxCell>
+        <mxCell id="reload" value="插件图 / 配置热重载" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="90" y="750" width="180" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="dispose" value="释放旧实例&#xa;WebSocket / timers / tools" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontColor=#4C1D5F;" vertex="1" parent="1">
+          <mxGeometry x="650" y="740" width="210" height="68" as="geometry"/>
+        </mxCell>
+        <mxCell id="out-filter" value="输出护栏与路由&#xa;SILENT / 防思考泄漏 / 去重 / 分片" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontColor=#4C1D5F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1430" y="615" width="245" height="86" as="geometry"/>
+        </mxCell>
+        <mxCell id="qq-tools" value="QQ 工具层&#xa;qq_send / reply / image / file …&#xa;本地图片转 base64://" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontColor=#4C1D5F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="725" width="230" height="86" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="session" value="SessionManager&#xa;复用或恢复 QQ 会话" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontColor=#1E3A5F;" vertex="1" parent="1">
+          <mxGeometry x="390" y="925" width="200" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="agent" value="DSH Agent / LLM&#xa;接收多模态用户消息" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontColor=#1E3A5F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="925" width="210" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="tool-decision" value="调用 QQ 工具？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontColor=#713F12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1045" y="915" width="180" height="92" as="geometry"/>
+        </mxCell>
+        <mxCell id="assistant-text" value="生成普通助手正文" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontColor=#1E3A5F;" vertex="1" parent="1">
+          <mxGeometry x="1380" y="930" width="190" height="62" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="qq-in" target="napcat-in"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="napcat-in" target="runtime"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="runtime" target="gate"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#B85450;fontColor=#7F1D1D;" edge="1" parent="1" source="gate" target="ignored"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;fontColor=#166534;" edge="1" parent="1" source="gate" target="parse"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="parse" target="has-image"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;fontColor=#166534;" edge="1" parent="1" source="has-image" target="download"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="download" target="attach"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" value="成功" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;fontColor=#166534;" edge="1" parent="1" source="attach" target="compose"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" value="失败" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#D79B00;fontColor=#92400E;dashed=1;" edge="1" parent="1" source="attach" target="fallback"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#D79B00;dashed=1;" edge="1" parent="1" source="fallback" target="compose"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e12" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;fontColor=#7C3AED;" edge="1" parent="1" source="has-image" target="compose"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1000" y="720"/><mxPoint x="215" y="720"/></Array></mxGeometry></mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="compose" target="session"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="session" target="agent"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="agent" target="tool-decision"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e16" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="tool-decision" target="assistant-text"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e17" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#7C3AED;fontColor=#5B21B6;" edge="1" parent="1" source="tool-decision" target="qq-tools"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="assistant-text" target="out-filter"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="out-filter" target="napcat-out"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#7C3AED;" edge="1" parent="1" source="qq-tools" target="napcat-out"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#475569;" edge="1" parent="1" source="napcat-out" target="qq-out"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#7C3AED;dashed=1;" edge="1" parent="1" source="reload" target="dispose"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e23" value="新实例接管" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#7C3AED;fontColor=#5B21B6;dashed=1;" edge="1" parent="1" source="dispose" target="runtime"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
