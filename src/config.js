@@ -31,15 +31,15 @@ export const ConfigSchema = Schema.object({
   wsUrl: Schema.string()
     .default('')
     .description(
-      'NapCat（或其它 OneBot 11 实现）的正向 WebSocket 地址，例如 ws://127.0.0.1:3001。' +
+      'SnowLuma（或其它 OneBot 11 实现）的正向 WebSocket 地址，例如 ws://127.0.0.1:3001。' +
         '留空就不连接——不会偷偷去连 3001，启动时会在日志里提示去哪配',
     ),
   accessToken: Schema.string()
     .default('')
-    .description('与 NapCat 配置里一致的 access token，留空表示不鉴权（仅建议在本机回环场景）'),
+    .description('与 SnowLuma / OneBot 服务端配置一致的 access token，留空表示不鉴权（仅建议在本机回环场景）'),
   selfId: Schema.string()
     .default('')
-    .description('机器人自己的 QQ 号。留空时启动会向 NapCat 查询 get_login_info'),
+    .description('机器人自己的 QQ 号。留空时启动会通过 OneBot 的 get_login_info 查询'),
   reconnectMs: Schema.number()
     .default(5000)
     .description('断线重连间隔，单位毫秒'),
@@ -52,7 +52,7 @@ export const ConfigSchema = Schema.object({
   uiOnly: Schema.boolean()
     .default(false)
     .description(
-      '只提供 DSH 设置界面里的那一页，不连接 NapCat、不起会话。桌面 / Web 那份装一份、配成 true，就是纯设置面板；QQ 本体跑在另一个 profile 里，不然同一个号两处登录会抢消息',
+      '只提供 DSH 设置界面里的那一页，不连接 OneBot 服务端、不起会话。桌面 / Web 那份装一份、配成 true，就是纯设置面板；QQ 本体跑在另一个 profile 里，不然同一个号两处登录会抢消息',
     ),
   workspaceRoot: Schema.string()
     .default('')
@@ -186,7 +186,7 @@ export const ConfigSchema = Schema.object({
     .description('群里另一个机器人说话时要不要接（关着 = 同类说啥都不理，连 @ 也不接）'),
   peerBots: Schema.array(Schema.string())
     .default([])
-    .description('已知的同类机器人 QQ 号；填了才认得出「这句是别的机器人发的」（NapCat 也带 is_robot 时同样认）'),
+    .description('已知的同类机器人 QQ 号；填了才认得出「这句是别的机器人发的」（服务端带 is_robot 时也会识别）'),
   // 2026-10-29 姐姐：「有没有办法能做到能私聊，但是能停下」——同类连着聊的刹车。
   // 私聊里两只鲸鲸互相回话没有天然终点：A 回 B，B 又回 A，每轮都算「有人跟我说话」，
   // 出站限流只能把它压慢、停不下来。这个数字是「连着接几轮就先不接」；真人一开口就清零。

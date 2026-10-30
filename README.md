@@ -2,17 +2,17 @@
 
 把 **QQ** 接成 DeepSeek Harness 的一个前端：私聊、群聊都能和同一个 Agent 聊；语音听得懂、图片看得见，还能戳一戳、贴表情、点赞。
 
-底层走 [OneBot v11](https://github.com/botuniverse/onebot-11) 协议，默认搭配 [NapCat](https://napneko.github.io/)。不用公网 IP、不用备案、不用企业主体。
+底层走 [OneBot v11](https://github.com/botuniverse/onebot-11) 协议，兼容 SnowLuma、[NapCat](https://napneko.github.io/) 等 OneBot 服务端。不用公网 IP、不用备案、不用企业主体。
 
 > ⚠️ **先说清楚**：NapCat 属于「QQ 协议端」，跑在你自己登录的 QQ 客户端上，**不符合腾讯的用户协议**。用小号、别和常用号同一台设备、别发垃圾消息，账号有被风控或封禁的可能。插件只负责把 OneBot 消息转给 Agent，协议端本身怎么合规、怎么稳，由你自己负责。场景能用 [QQ 官方机器人](https://bot.q.qq.com/) 的，优先用官方的。
 
 > 📢 **这是个公开仓库**：MIT，随便取用、改、再发。作者是个人不是公司，没有客服、没有 SLA，能回 issue 但不保证秒回。
 > 提 issue 或贴日志之前，请先把 **token、真实 QQ 号、本机路径** 抹掉——发出去就收不回来了。
 
-> 🔌 **一台 NapCat 的 WS 只该被一个 Agent 连着**：再装一个 `dsh-onebot-hub` 之类的插件会抢同一条消息，两边都只收到一半（日志里每行出现两次就是证据）。细节见 [和别的 OneBot 插件共存](#和别的-onebot-插件共存)。
+> 🔌 **同一个 OneBot WebSocket 只该被一个 Agent 连着**：无论使用 SnowLuma 还是 NapCat，再装一个 `dsh-onebot-hub` 之类的插件都可能重复处理消息（日志里每行出现两次就是证据）。细节见 [和别的 OneBot 插件共存](#和别的-onebot-插件共存)。
 
 ```
-你的 QQ 客户端  ←→  NapCat（协议端，注入 QQ）
+你的 QQ 客户端  ←→  SnowLuma / NapCat（OneBot 服务端）
                         ↕  OneBot v11 WebSocket
                 dsh-qq-onebot 插件（跑在 DSH 宿主进程里）
                         ↕  进程内 ctx.agents
@@ -33,6 +33,8 @@
 | 问答能转回 QQ | `ask_user_question` 抛的问题会变成一条 QQ 消息，回个数字就行 |
 
 ## 三步跑通
+
+下面用 NapCat 的 Windows 一键版作为安装示例。**已经使用 SnowLuma 的用户无需安装 NapCat**，直接把插件的 `wsUrl` 和 `accessToken` 指向 SnowLuma 提供的 OneBot 11 WebSocket 即可。
 
 ### 1. 装 NapCat，登录小号
 
@@ -176,11 +178,11 @@ privateAllow:
 
 > 从 1.2.1 及更早升级上来：以前默认是 `open`。配置里显式写过 `privateMode` 的不受影响；没写过的，升级后私聊会静默不回应——启动日志里那句「私聊白名单（privateAllow）是空的」就是在说这件事。
 
-同一个 QQ 号不能两处同时登录（会互相抢消息），所以桌面 / Web GUI 那份配 `uiOnly: true`：只提供设置页，不连 NapCat；真正干活的是 `--profile qqbot` 那个宿主。
+同一个 QQ 号不能两处同时登录（会互相抢消息），所以桌面 / Web GUI 那份配 `uiOnly: true`：只提供设置页，不连 OneBot 服务端；真正干活的是 `--profile qqbot` 那个宿主。
 
 ## 和别的 OneBot 插件共存
 
-一台 NapCat 的 WebSocket 一般只该被**一个** Agent 连着。社区的 `dsh-onebot-hub` 之类也连同一台 NapCat 时，两边都会收到同一条消息、各自回一遍——表现是「回复错乱」「一条消息两份回复」，不是任何一边的 bug。
+一个 OneBot WebSocket 一般只该被**一个** Agent 连着。社区的 `dsh-onebot-hub` 之类也连同一个 SnowLuma / NapCat 服务端时，两边都会收到同一条消息、各自回一遍——表现是「回复错乱」「一条消息两份回复」，不是任何一边的 bug。
 
 **只留一个：**
 
@@ -194,10 +196,10 @@ dsh plugin --profile desktop remove dsh-onebot-hub
 ## 常见问题
 
 **设置里没有「QQ」这一项**
-浏览器半端没被加载。最常见两个原因：插件版本太老（1.1.1 之前的 `dsh.client.inject` 写了宿主要么没有的包），或者装的是改过包名却没跟着改 `client.js` 里 `id` 的版本。**现在不用等更新**：连上 NapCat 只看设置文件的话，改 `$DSH_HOME/dsh-qq/settings.json` 就够了（见上面第 3 步的兜底），QQ 本身不依赖设置页。插件启动日志里搜 `客户端半端自检`，它会把原因写在里面。
+浏览器半端没被加载。最常见两个原因：插件版本太老（1.1.1 之前的 `dsh.client.inject` 写了宿主要么没有的包），或者装的是改过包名却没跟着改 `client.js` 里 `id` 的版本。**现在不用等更新**：连接 OneBot 只看设置文件的话，改 `$DSH_HOME/dsh-qq/settings.json` 就够了（见上面第 3 步的兜底），QQ 本身不依赖设置页。插件启动日志里搜 `客户端半端自检`，它会把原因写在里面。
 
 **连不上 / 一直重连**
-先看 `wsUrl` 填没填——1.2.1 起留空就完全不连接，日志里会明说「wsUrl 还没填」，不会再对着 3001 空转。填了还连不上，看 NapCat 的 WebUI 里 WS 服务器是不是「启用」、端口对不对、Token 两边是否一模一样。日志里 `与 NapCat 断开` 那一行会带原因，之后的重试不再逐条刷屏，恢复时会补一句「断了多久、重试几次」。
+先看 `wsUrl` 填没填——1.2.1 起留空就完全不连接，日志里会明说「wsUrl 还没填」，不会再对着 3001 空转。填了还连不上，检查 SnowLuma / OneBot 服务端的 WS 是否启用、端口是否正确、Token 两边是否一致。日志里 `与 OneBot 服务端断开` 那一行会带原因，之后的重试不再逐条刷屏，恢复时会补一句「断了多久、重试几次」。
 
 **配置看着没问题，但就是发不出去**
 NapCat 的 **WS 和 HTTP 是两个不同的 token**，填错不报错，只是安静地发不出去。另外别让 PowerShell 把配置写出 BOM——一个看不见的字节能让所有判断歪掉。
@@ -206,7 +208,7 @@ NapCat 的 **WS 和 HTTP 是两个不同的 token**，填错不报错，只是�
 群里先确认 @ 了；私聊看 `privateMode` 是不是 `allowlist` 却没把自己加进 `privateAllow`；都没问题就看 DSH 那边是不是还在跑（一轮本身要时间）。
 
 **消息重复发两遍**
-一般是两个 qqbot 宿主同时连着 NapCat（日志里每行出现两次）。用 `tools/start-bot.cmd` 起，它会先掐掉旧的宿主。
+一般是两个 qqbot 宿主同时连着同一个 OneBot 服务端（日志里每行出现两次）。用 `tools/start-bot.cmd` 起，它会先掐掉旧的宿主。
 
 **语音没转出文字**
 先确认 `asrPython -c "import vosk"` 能过，再手动跑一次 `<asrPython> <asrScript> <音频文件> [模型目录]`。模型目录必须是**纯 ASCII 路径**（vosk 的 C++ 层不认中文路径）。
@@ -231,7 +233,7 @@ NapCat 的 **WS 和 HTTP 是两个不同的 token**，填错不报错，只是�
 
 接入只是第一天，第二天才见真章。装之前先想清楚三件事：**你准备长期维护它吗？不想养了会好好收尾吗？它在公共场合出现时，你负责吗？**——群里其他人看到的是一个会说人话的账号，不是一个玩具。
 
-1. **别把 token 提交进仓库。** NapCat 的 access token、模型 API key 都放配置里，别写进代码或 commit。
+1. **别把 token 提交进仓库。** OneBot access token、模型 API key 都放配置里，别写进代码或 commit。
 2. **别手改 profile 的 `package.json` / `pnpm-lock.yaml` / `node_modules`。** 装插件用 `dsh plugin --profile <名字> add`，而且要在 DSH 完全退出时做。手改 lockfile 会让 pnpm 重排包、撞到被占用的文件，最坏是整个桌面端报「web 缺失或文件损坏」（这个坑真踩过，最后靠卸载重装才救回来）。
 3. **杀进程按路径挑，别 `Get-Process -Name QQ | Stop-Process` 一把全杀。** NapCat 的 QQ 和你桌面的 QQ 是两套程序，一把杀会把自己踢下线。
 4. **它会花你的 token。** 群里每句话都是一次模型调用，先用 `rateLimitPerMin`、`groupReplyGapMs`、`groupWakeMs` 把节奏压住。

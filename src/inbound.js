@@ -141,7 +141,7 @@ function gapReady(config, groupId, userId) {
 }
 
 /** 这条消息是不是「同类」（群里另一个机器人）发的。
- *  两条判断：`sender.is_robot`（NapCat 对群机器人会带，但不是每只都带），
+ *  两条判断：`sender.is_robot`（部分 OneBot 服务端会带，但不是每只都带），
  *  以及配置里的 `peerBots` 名单（QQ 号）——名单最可靠，兜底。 */
 function isPeerBot(config, senderId, event) {
   const id = String(senderId ?? '')
@@ -380,7 +380,7 @@ export async function expandForwards(client, forwards, { logger } = {}) {
 
     let res
     try {
-      // NapCat 认 message_id，标准 OneBot 写 id——两个都递过去，谁认谁接
+      // 不同 OneBot 实现分别认 message_id / id——两个都递过去，谁认谁接
       res = await client.call('get_forward_msg', { message_id: f.id, id: f.id })
     } catch (err) {
       logger?.debug?.(`[dsh-qq] 合并转发取不到（${f.id}）：${err?.message || err}`)

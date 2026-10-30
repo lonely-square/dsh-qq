@@ -6,7 +6,7 @@ import test from 'node:test'
 
 import { imageFileArg } from '../src/tools.js'
 
-test('宿主本地图片转成 NapCat 容器可读的 base64 参数', () => {
+test('宿主本地图片转成 OneBot 容器可读的 base64 参数', () => {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-qq-send-'))
   const file = join(dir, 'face.png')
   writeFileSync(file, Buffer.from([1, 2, 3, 4]))

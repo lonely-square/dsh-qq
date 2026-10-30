@@ -8,8 +8,8 @@
 
 | 配置 | 默认 | 说明 |
 | --- | --- | --- |
-| `wsUrl` | 空 | NapCat 的 WebSocket 服务端地址，如 `ws://127.0.0.1:3001`。**留空就不连接**（不会偷偷去连 3001）；填好保存约 0.8 秒自动接上，不用重启 |
-| `accessToken` | 空 | NapCat 那边设的 Token，留空就不带鉴权头 |
+| `wsUrl` | 空 | SnowLuma 或其他 OneBot 服务端的 WebSocket 地址，如 `ws://127.0.0.1:3001`。**留空就不连接**（不会偷偷去连 3001）；填好保存约 0.8 秒自动接上，不用重启 |
+| `accessToken` | 空 | OneBot 服务端设置的 Token，留空就不带鉴权头 |
 | `selfId` | 空 | 机器人 QQ 号。留空会自动 `get_login_info` 查 |
 | `reconnectMs` | `5000` | 断线重连间隔（毫秒） |
 

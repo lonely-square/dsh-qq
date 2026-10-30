@@ -170,7 +170,7 @@ export function watchSettingsFile(ctx, config, overridesRef, personaRef, logger,
         if (want && !client.connected && client.url !== want) {
           client.url = want
           client.start()
-          logger.info(`wsUrl 改成了 ${want}，开始连接 NapCat`)
+          logger.info(`wsUrl 改成了 ${want}，开始连接 OneBot 服务端`)
         }
       }
     } catch (err) {
@@ -205,7 +205,7 @@ export function watchSettingsFile(ctx, config, overridesRef, personaRef, logger,
 }
 
 /**
- * 把 QQ（OneBot 11 / NapCat）当成 DSH 的一个前端：
+ * 把 QQ（通过 SnowLuma 或其他 OneBot 11 服务端）当成 DSH 的一个前端：
  * 私聊 / 群聊各对应一个持久 Agent 会话，消息进来 followup，回复走 session/event 出去。
  */
 export function apply(ctx, config) {
@@ -260,11 +260,11 @@ export function apply(ctx, config) {
     )
   }
 
-  // 只当「设置面板」用：桌面 / Web GUI 那份只提供这一页，不去连 NapCat。
+  // 只当「设置面板」用：桌面 / Web GUI 那份只提供这一页，不去连 OneBot 服务端。
   // 不然同一个 QQ 号在两处同时登录，消息会互相抢。
   if (config.uiOnly) {
     mountSettingsApi({ personaRef, overridesRef })
-    logger.info('uiOnly：只提供设置页，不连接 NapCat')
+    logger.info('uiOnly：只提供设置页，不连接 OneBot 服务端')
     return
   }
 
@@ -278,7 +278,7 @@ export function apply(ctx, config) {
   const wsUrl = String(config.wsUrl ?? '').trim()
   if (!wsUrl) {
     logger.warn(
-      `还没配 NapCat 的 WebSocket 地址（wsUrl），QQ 不会连上。` +
+      `还没配 OneBot 服务端的 WebSocket 地址（wsUrl），QQ 不会连上。` +
         `去设置 → QQ 里填，或改 ${settingsFileOf(ctx, logger)}（常见值 ws://127.0.0.1:3001）；` +
         `保存后约 800ms 自动接上，不用重启宿主。`,
     )
@@ -531,7 +531,7 @@ const pin = createPin({ config, logger })
     if (dropCount === 1) {
       lastSummaryAt = now
       logger.warn(
-        `与 NapCat 断开${reason ? `（${reason}）` : ''}，稍后自动重连；后续重试不再逐条报，恢复时会通知`,
+        `与 OneBot 服务端断开${reason ? `（${reason}）` : ''}，稍后自动重连；后续重试不再逐条报，恢复时会通知`,
       )
       return
     }
@@ -539,7 +539,7 @@ const pin = createPin({ config, logger })
       lastSummaryAt = now
       const mins = Math.max(1, Math.round((now - downSince) / 60000))
       logger.warn(
-        `与 NapCat 断开已持续约 ${mins} 分钟，累计重试 ${dropCount} 次，最近一次：${reason || '无详情'}`,
+        `与 OneBot 服务端断开已持续约 ${mins} 分钟，累计重试 ${dropCount} 次，最近一次：${reason || '无详情'}`,
       )
     }
   }
@@ -547,7 +547,7 @@ const pin = createPin({ config, logger })
   client.on('open', () => {
     if (downSince > 0) {
       const mins = Math.max(1, Math.round((Date.now() - downSince) / 60000))
-      logger.info(`NapCat 连回来了（断了约 ${mins} 分钟，累计重试 ${dropCount} 次）`)
+      logger.info(`OneBot 服务端连接已恢复（断了约 ${mins} 分钟，累计重试 ${dropCount} 次）`)
     }
     downSince = 0
     dropCount = 0
@@ -627,6 +627,6 @@ const pin = createPin({ config, logger })
   if (wsUrl) {
     client.start()
   } else {
-    logger.info('wsUrl 还没填，先不连接 NapCat（填好并保存后会自动接上）')
+    logger.info('wsUrl 还没填，先不连接 OneBot 服务端（填好并保存后会自动接上）')
   }
 }

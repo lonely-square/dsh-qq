@@ -299,7 +299,7 @@ window.__ModuleLoader__.load({
           h('div', { 'data-qq-row': '' },
             h('div', { 'data-qq-dot': '', 'data-on': connected ? '' : undefined }),
             h('div', { 'data-qq-label': '', 'data-qq-grow': '' },
-              connected ? '已连上 NapCat' : '没连上 NapCat'),
+              connected ? '已连上 OneBot 服务端' : '未连上 OneBot 服务端'),
             st ? h('span', { 'data-qq-pill': '' }, st.selfName ? `${st.selfName} (${st.selfId})` : (st.selfId || '未登录')) : null),
           h('div', { 'data-qq-kv': '' },
             '地址：', st ? st.wsUrl : '',
@@ -313,16 +313,16 @@ window.__ModuleLoader__.load({
         /* ── 连接 ── */
         h('div', { 'data-qq-sec': '' },
           h('div', { 'data-qq-h': '' }, '连接'),
-          textField('wsUrl', 'NapCat 的 WebSocket 地址', {
-            hint: 'OneBot 11 正向 WebSocket。NapCat 里开的「正向 WS」默认是 ws://127.0.0.1:3001。改完点上面的「重连」。',
+          textField('wsUrl', 'OneBot WebSocket 地址', {
+            hint: 'SnowLuma 或其他 OneBot 11 服务端的正向 WebSocket，例如 ws://127.0.0.1:3001。改完点上面的「重连」。',
             mono: true,
           }),
           textField('accessToken', 'access token', {
-            hint: '跟 NapCat 配置里那一串要一致。只在本机回环可以留空。',
+            hint: '跟 SnowLuma / OneBot 服务端配置一致。只在本机回环可以留空。',
             mono: true,
           }),
           textField('selfId', '机器人自己的 QQ 号', {
-            hint: '留空就启动时自动问 NapCat 要（一般不用填）。',
+            hint: '留空就启动时通过 OneBot 的 get_login_info 自动查询（一般不用填）。',
           })),
 
         /* ── 它是谁 ── */

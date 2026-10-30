@@ -1,7 +1,7 @@
 /**
  * OneBot 11 消息段的解析与组装。
  *
- * NapCat 默认 `messagePostFormat: 'array'`，但我们两种都兜住：
+ * OneBot 服务端常用 `messagePostFormat: 'array'`，但我们两种都兜住：
  * 万一用户配成了字符串格式（带 CQ 码），也要能读。
  */
 

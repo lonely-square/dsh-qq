@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { acquireRuntimeLease } from '../src/runtime-lease.js'
 
-test('同一 NapCat 地址的新实例会先释放旧实例', () => {
+test('同一 OneBot 地址的新实例会先释放旧实例', () => {
   const disposed = []
   const releaseFirst = acquireRuntimeLease('test:same-endpoint', (reason) => disposed.push(`first:${reason}`))
   const releaseSecond = acquireRuntimeLease('test:same-endpoint', (reason) => disposed.push(`second:${reason}`))
@@ -19,7 +19,7 @@ test('同一 NapCat 地址的新实例会先释放旧实例', () => {
   releaseThird()
 })
 
-test('不同 NapCat 地址互不干扰，主动 release 后也不会被重复释放', () => {
+test('不同 OneBot 地址互不干扰，主动 release 后也不会被重复释放', () => {
   const disposed = []
   const releaseA = acquireRuntimeLease('test:endpoint-a', () => disposed.push('a'))
   const releaseB = acquireRuntimeLease('test:endpoint-b', () => disposed.push('b'))

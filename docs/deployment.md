@@ -2,6 +2,8 @@
 
 关掉窗口它就没了，掉线了也没人知道——这是接进 QQ 之后最先遇到的两个问题。`tools/` 里的脚本就是为这两件事准备的。
 
+> 这一组 Windows 辅助脚本是给 NapCat 一键版准备的；使用 SnowLuma 时，DSH 插件本身照常工作，但不要用这些脚本启停 SnowLuma。
+
 | 脚本 | 干什么 |
 | --- | --- |
 | `start-bot.cmd` | 起 NapCat + qqbot 宿主。**会先掐掉旧的 qqbot 宿主**，避免两个宿主抢同一条连接（同一句话回两遍）。 |
@@ -21,7 +23,7 @@
 Get-Content (Get-ChildItem logs\qqbot-*.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1) -Tail 80
 ```
 
-插件里 `logger.info` 打的东西都在这（连上 NapCat、主动说话已启动、工具调用失败的原因…）。`debug: true` 时细节会更多。
+插件里 `logger.info` 打的东西都在这（连上 OneBot 服务端、主动说话已启动、工具调用失败的原因…）。`debug: true` 时细节会更多。
 
 ## 为什么看门狗要检查「Established 连接」
 

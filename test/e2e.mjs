@@ -1,5 +1,5 @@
 /**
- * 端到端自检：假 NapCat + 假宿主 ctx，把 dsh-qq 的整条链路跑一遍。
+ * 端到端自检：假 OneBot 服务端 + 假宿主 ctx，把 dsh-qq 的整条链路跑一遍。
  *
  *   node test/e2e.mjs
  *
@@ -105,7 +105,7 @@ const config = Config({
 })
 
 apply(ctx, config)
-await waitFor(() => mock.clientCount === 1, { what: '插件连上假 NapCat' })
+await waitFor(() => mock.clientCount === 1, { what: '插件连上假 OneBot 服务端' })
 console.log('✓ 连接与鉴权通过')
 
 // —— 私聊 ——

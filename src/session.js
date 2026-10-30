@@ -112,7 +112,7 @@ export class SessionManager {
     const current = this.#records.get(record.sessionId)
     if (!current) return false
     const baseKey = this.#baseKey(current.scope, current.peerId)
-    // ⭐ 2026-10-25：换会话时把「交接」留给下一代（姐姐/NapCat 触发 /reset 时也能接上话）。
+    // ⭐ 2026-10-25：换会话时把「交接」留给下一代（姐姐/OneBot 触发 /reset 时也能接上话）。
     if (Array.isArray(seed) && seed.length > 0) this.#seedByKey.set(baseKey, seed)
     // 代数读内存优先、盘兜底：宿主重启后内存空了，靠盘记住「已经 reset 过一次」
     const next = (this.#gens.get(baseKey) ?? this.sessionState.gen(baseKey)) + 1

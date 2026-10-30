@@ -4,7 +4,7 @@ import WebSocket from 'ws'
 const WS_OPEN = 1
 
 /**
- * OneBot 11 客户端（正向 WebSocket，插件作为客户端去连 NapCat）。
+ * OneBot 11 客户端（正向 WebSocket，插件作为客户端连接 SnowLuma 等服务端）。
  *
  * 为什么是正向：插件只需要一个地址，不用自己 listen 端口，
  * 也就不会和宿主抢端口、不会被沙箱的「出站才允许」策略挡住。

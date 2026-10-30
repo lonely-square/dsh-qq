@@ -110,8 +110,8 @@ function peerOf(record) {
 
 /**
  * 本地图片路径 → `base64://…`。
- * NapCat 跑在 Docker 里时看不到宿主路径，转成 OneBot 支持的 base64 才能发出去。
- * URL、相对路径、不存在的文件和超过 8 MiB 的文件原样返回，交给 NapCat 自己处理。
+ * OneBot 服务端跑在 Docker 里时看不到宿主路径，转成协议支持的 base64 才能发出去。
+ * URL、相对路径、不存在的文件和超过 8 MiB 的文件原样返回，交给服务端自己处理。
  */
 export function imageFileArg(file) {
   const raw = String(file ?? '').trim()
@@ -591,7 +591,7 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
     async execute(args, exec) {
       const record = needRecord(manager, exec)
       const messageId = Number(args?.message_id ?? record.lastImageMessageId ?? record.lastMessageId ?? 0)
-      // SnowLuma / NapCat 的 message_id 是有符号 32 位整数，负数同样合法。
+      // SnowLuma 等 OneBot 实现的 message_id 是有符号 32 位整数，负数同样合法。
       if (!Number.isFinite(messageId) || messageId === 0) {
         throw new Error('qq_images: 不知道要看哪条消息')
       }
