@@ -206,7 +206,14 @@ export function registerTools(ctx, { client, manager, config, logger, pin, wake,
         const title = String(args?.query ?? '').trim()
           ? `当前${record.scope === 'group' ? '群' : '私聊'}中与「${String(args.query).trim()}」相关：${hitCount} 个命中点，展开为 ${count} 条原话（★ = 命中点，片段内旧→新）：`
           : `当前${record.scope === 'group' ? '群' : '私聊'}最近 ${count} 条原话（旧→新）：`
-        return { ok: true, count, hitCount, text: `${title}\n${formatConversationWindows(result.windows)}` }
+        return {
+          ok: true,
+          count,
+          hitCount,
+          text:
+            '历史相关对话记录不一定是最新状态，请以实际为准。\n' +
+            `「历史对话开始」\n${title}\n${formatConversationWindows(result.windows)}\n「历史对话结束」`,
+        }
       } catch (err) {
         logger.warn?.(`qq_history 查询失败: ${err?.message ?? err}`)
         return { ok: false, count: 0, hitCount: 0, text: `历史对话查询失败：${err?.message ?? err}` }
